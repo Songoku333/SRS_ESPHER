@@ -66,7 +66,7 @@ const Home: React.FC<HomeProps> = ({ setCurrentPage }) => {
                 <h2 className="text-3xl font-bold text-gray-800">Casos de Éxito Destacados</h2>
                 <p className="mt-4 text-gray-600 max-w-2xl mx-auto">Nuestro impacto no es teórico, es real. Vea cómo hemos ayudado a líderes a prosperar.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <SuccessStoryCard 
                     title="Portfolio Inmobiliario Global" 
                     result="Reducción del 30% en riesgo climático." 
@@ -81,6 +81,11 @@ const Home: React.FC<HomeProps> = ({ setCurrentPage }) => {
                     title="Fondo de Inversión Sostenible" 
                     result="Mejora de 10 puntos en la evaluación GRESB." 
                     image="https://picsum.photos/400/300?random=3"
+                />
+                <SuccessStoryCard 
+                    title="Data Center Hyperscaler" 
+                    result="Optimización del PUE en un 15%." 
+                    image="https://picsum.photos/400/300?random=4"
                 />
             </div>
             <div className="text-center mt-12">

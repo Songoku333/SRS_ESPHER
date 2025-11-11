@@ -29,7 +29,7 @@ const Footer: React.FC<FooterProps> = ({ setCurrentPage }) => {
           <div>
             <h4 className="font-semibold tracking-wider uppercase">Contacto</h4>
             <ul className="mt-4 space-y-2 text-gray-400">
-              <li><a href="mailto:info@smartrem.com" className="hover:text-emerald-400 transition-colors">info@smartrem.com</a></li>
+              <li><a href="mailto:info@smartremsolutions.com" className="hover:text-emerald-400 transition-colors">info@smartremsolutions.com</a></li>
               <li>Madrid, España</li>
             </ul>
             <div className="mt-4">

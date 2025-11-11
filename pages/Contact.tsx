@@ -70,11 +70,11 @@ const Contact: React.FC = () => {
           <div className="space-y-8 pt-8 md:pt-0">
             <div>
               <h3 className="text-xl font-semibold text-gray-800">Dirección</h3>
-              <p className="mt-2 text-gray-600">Paseo de la Castellana, 93<br/>28046 Madrid, España</p>
+              <p className="mt-2 text-gray-600">Calle Alcalá, 375, 1º<br/>28027 Madrid, España</p>
             </div>
             <div>
               <h3 className="text-xl font-semibold text-gray-800">Email</h3>
-              <a href="mailto:contacto@smartremsolutions.com" className="mt-2 text-emerald-600 hover:underline">contacto@smartremsolutions.com</a>
+              <a href="mailto:info@smartremsolutions.com" className="mt-2 text-emerald-600 hover:underline">info@smartremsolutions.com</a>
             </div>
             <div>
               <h3 className="text-xl font-semibold text-gray-800">LinkedIn</h3>
