@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { type Page } from '../types';
 
@@ -71,6 +72,7 @@ const Services: React.FC<ServicesProps> = ({ setCurrentPage }) => {
             <p>Esta es la pieza central de nuestra propuesta de valor. Aquí es donde el riesgo se convierte en estrategia y la estrategia genera un impacto medible.</p>
             <ul>
                 <li><strong>Technical Due Diligence (TDD) 360°:</strong> "No solo evaluamos el activo, medimos su pulso real". Integramos análisis del estado real de los equipos, el riesgo climático y el potencial de descarbonización para una visión completa del riesgo y la oportunidad.</li>
+                <li><strong>Alineación con Taxonomía y Regulaciones de la UE:</strong> "Navegamos la complejidad regulatoria por usted." Ofrecemos consultoría experta sobre el cumplimiento del Código de Conducta de eficiencia energética, la Taxonomía Verde Europea y la EPBD, asegurando que sus activos no solo cumplan, sino que lideren el mercado.</li>
                 <li><strong>Commissioning y Retro-Commissioning:</strong> "Garantizamos que tus activos cumplan su promesa de rendimiento." Aseguramos que los sistemas nuevos funcionen como se diseñaron y optimizamos los existentes para recuperar su eficiencia perdida.</li>
                 <li><strong>Auditorías Energéticas y Planes de Descarbonización Basados en la Realidad:</strong> Creamos planes accionables, financiables y rentables que nacen de su operación, no de plantillas. Vinculamos cada acción a los principios de la Sostenibilidad Esférica.</li>
                 <li><strong>Informes de Sostenibilidad ESG y Gestión de Riesgo Climático:</strong> "Pasamos del análisis a la gestión activa." Preparamos su organización para los riesgos físicos y de transición, convirtiendo el cumplimiento normativo en una ventaja competitiva.</li>

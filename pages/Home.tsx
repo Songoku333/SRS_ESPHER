@@ -1,29 +1,111 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { type Page } from '../types';
 import SustainableEngineeringIcon from '../components/icons/SustainableEngineeringIcon';
 import ResilienceIcon from '../components/icons/ResilienceIcon';
 import SmartEnergyIcon from '../components/icons/SmartEnergyIcon';
 import EsgConsultingIcon from '../components/icons/EsgConsultingIcon';
+import { GoogleGenAI } from '@google/genai';
 
 interface HomeProps {
     setCurrentPage: (page: Page) => void;
 }
 
 const Home: React.FC<HomeProps> = ({ setCurrentPage }) => {
+  // Use a blurred placeholder initially for a better loading experience
+  const placeholderImageUrl = "https://images.unsplash.com/photo-1611251915391-a10c05a07aa2?q=80&w=1920&auto=format&fit=crop&blur=10";
+  const [heroImageUrl, setHeroImageUrl] = useState(placeholderImageUrl);
+  const [showApiKeyButton, setShowApiKeyButton] = useState(false);
+
+  const generateHeroImage = async () => {
+    try {
+        // Check if API key is selected (required for Gemini 3.0 models)
+        if (window.aistudio) {
+            const hasKey = await window.aistudio.hasSelectedApiKey();
+            if (!hasKey) {
+                setShowApiKeyButton(true);
+                return;
+            }
+        }
+
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // Using Gemini 3.0 Pro Image Preview for high-fidelity, conceptual imagery
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-image-preview',
+            contents: {
+              parts: [
+                {
+                  text: 'A cinematic, photorealistic wide shot representing "Spherical Sustainability" for a corporate consulting firm. The composition should feature a harmonious blend of futuristic glass architecture and lush, vertical gardens, encapsulated within a subtle, glowing spherical aura or lens effect. Lighting should be golden hour, warm and inspiring. High detail, 8k resolution, architectural photography style.',
+                },
+              ],
+            },
+            config: {
+                imageConfig: {
+                    aspectRatio: "16:9",
+                    imageSize: "2K"
+                }
+            },
+        });
+
+        // Parse response for Gemini 3 Image model structure
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                const base64EncodeString: string = part.inlineData.data;
+                const imageUrl = `data:image/png;base64,${base64EncodeString}`;
+                setHeroImageUrl(imageUrl);
+                setShowApiKeyButton(false);
+                break; 
+            }
+        }
+
+      } catch (error: any) {
+        console.error("Error generating hero image:", error);
+        // Handle Permission Denied (403) specifically
+        if (error.status === 403 || error.message?.includes('PERMISSION_DENIED') || error.toString().includes('403')) {
+             setShowApiKeyButton(true);
+        }
+      }
+    };
+
+  useEffect(() => {
+    generateHeroImage();
+  }, []);
+
+  const handleApiKeySelect = async () => {
+      if (window.aistudio) {
+          await window.aistudio.openSelectKey();
+          // Retry generation after key selection
+          generateHeroImage();
+      }
+  };
+
   return (
     <div className="animate-fadeIn">
       {/* Hero Section */}
-      <section className="relative h-[80vh] min-h-[500px] bg-cover bg-center text-white" style={{ backgroundImage: "url('https://picsum.photos/1600/900?grayscale&blur=2')" }}>
+      <section 
+        className="relative h-[80vh] min-h-[500px] bg-cover bg-center text-white transition-background-image" 
+        style={{ backgroundImage: `url('${heroImageUrl}')` }}
+      >
         <div className="absolute inset-0 bg-gray-900 bg-opacity-60"></div>
         <div className="relative container mx-auto px-6 h-full flex flex-col justify-center items-center text-center">
           <h1 className="text-4xl md:text-6xl font-bold leading-tight tracking-tight">Donde la Incertidumbre se Convierte en Valor.</h1>
           <p className="mt-6 text-lg md:text-xl max-w-3xl text-gray-200">
             La sostenibilidad tradicional es una foto fija en un mundo en movimiento. En Smart Rem Solutions, hemos adoptado un nuevo paradigma: la Sostenibilidad Esférica, un modelo de gestión integral que transforma el cambio en su mayor activo.
           </p>
-          <button onClick={() => setCurrentPage('philosophy')} className="mt-8 bg-emerald-500 text-white font-semibold px-8 py-3 rounded-full hover:bg-emerald-600 transition-transform duration-300 transform hover:scale-105 shadow-lg">
-            Descubre Nuestra Filosofía
-          </button>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <button onClick={() => setCurrentPage('philosophy')} className="bg-emerald-500 text-white font-semibold px-8 py-3 rounded-full hover:bg-emerald-600 transition-transform duration-300 transform hover:scale-105 shadow-lg">
+                Descubre Nuestra Filosofía
+            </button>
+            {showApiKeyButton && (
+                <button 
+                    onClick={handleApiKeySelect}
+                    className="mt-2 px-4 py-2 bg-black bg-opacity-40 hover:bg-opacity-60 text-gray-300 hover:text-white text-xs rounded transition-colors backdrop-blur-sm flex items-center gap-2"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                    Habilitar IA Generativa (Configurar API Key)
+                </button>
+            )}
+          </div>
         </div>
       </section>
 
@@ -70,22 +152,22 @@ const Home: React.FC<HomeProps> = ({ setCurrentPage }) => {
                 <SuccessStoryCard 
                     title="Portfolio Inmobiliario Global" 
                     result="Reducción del 30% en riesgo climático." 
-                    image="https://picsum.photos/400/300?random=1"
+                    image="https://images.unsplash.com/photo-1487958449943-2429e8be8625?q=80&w=800&auto=format&fit=crop"
                 />
                 <SuccessStoryCard 
                     title="Centro Logístico Europeo" 
                     result="Aumento del 25% en la eficiencia energética." 
-                    image="https://picsum.photos/400/300?random=2"
-                />
-                <SuccessStoryCard 
-                    title="Fondo de Inversión Sostenible" 
-                    result="Mejora de 10 puntos en la evaluación GRESB." 
-                    image="https://picsum.photos/400/300?random=3"
+                    image="https://images.unsplash.com/photo-1616401784845-180882ba9ba8?q=80&w=800&auto=format&fit=crop"
                 />
                 <SuccessStoryCard 
                     title="Data Center Hyperscaler" 
                     result="Optimización del PUE en un 15%." 
-                    image="https://picsum.photos/400/300?random=4"
+                    image="https://images.unsplash.com/photo-1580894908361-967195033215?q=80&w=800&auto=format&fit=crop"
+                />
+                <SuccessStoryCard 
+                    title="Promotor Inmobiliario (Taxonomía UE)" 
+                    result="Activo 100% alineado, +12% en valoración." 
+                    image="https://images.unsplash.com/photo-1560493676-04071c5f467b?q=80&w=800&auto=format&fit=crop"
                 />
             </div>
             <div className="text-center mt-12">
