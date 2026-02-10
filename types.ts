@@ -1,5 +1,5 @@
 
-export type Page = 'home' | 'philosophy' | 'services' | 'caseStudies' | 'contact' | 'analysis';
+export type Page = 'home' | 'philosophy' | 'services' | 'caseStudies' | 'contact' | 'analysis' | 'vision2026' | 'esg4dc';
 
 export interface CaseStudy {
   client: string;
