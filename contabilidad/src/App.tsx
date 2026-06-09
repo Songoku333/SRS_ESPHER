@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Page } from './types';
+import { initSync, useSyncInfo, SyncStatus } from './lib/sync';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Ofertas from './pages/Ofertas';
 import Proyectos from './pages/Proyectos';
@@ -24,9 +26,23 @@ const NAV: { page: Page; label: string; icon: string }[] = [
   { page: 'ajustes', label: 'Ajustes', icon: '⚙️' },
 ];
 
+const SYNC_LABEL: Record<SyncStatus, { texto: string; color: string }> = {
+  local: { texto: '● Solo en este navegador', color: 'text-slate-400' },
+  sin_sesion: { texto: '● Sin sesión', color: 'text-amber-400' },
+  conectando: { texto: '● Conectando…', color: 'text-amber-400' },
+  sincronizado: { texto: '● Sincronizado en la nube', color: 'text-green-400' },
+  guardando: { texto: '● Guardando…', color: 'text-amber-400' },
+  error: { texto: '● Error de sincronización', color: 'text-red-400' },
+};
+
 const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
+  const sync = useSyncInfo();
+
+  useEffect(() => {
+    initSync();
+  }, []);
 
   const render = () => {
     switch (page) {
@@ -52,6 +68,10 @@ const App: React.FC = () => {
         return <Ajustes />;
     }
   };
+
+  if (sync.status === 'sin_sesion') {
+    return <Login />;
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -84,10 +104,15 @@ const App: React.FC = () => {
             </button>
           ))}
         </nav>
-        <div className="px-5 py-3 text-[11px] text-slate-500 border-t border-slate-700">
-          Datos guardados en este navegador.
-          <br />
-          Haz copias desde Ajustes.
+        <div className="px-5 py-3 text-[11px] border-t border-slate-700">
+          <span className={SYNC_LABEL[sync.status].color} title={sync.error || ''}>
+            {SYNC_LABEL[sync.status].texto}
+          </span>
+          {sync.email && <div className="text-slate-500 mt-0.5">{sync.email}</div>}
+          {sync.status === 'local' && (
+            <div className="text-slate-500 mt-0.5">Activa la nube desde Ajustes.</div>
+          )}
+          {sync.error && <div className="text-red-400/80 mt-0.5">{sync.error}</div>}
         </div>
       </aside>
 

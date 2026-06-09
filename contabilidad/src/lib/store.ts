@@ -17,8 +17,20 @@ function load(): AppData {
 let state: AppData = load();
 const listeners = new Set<() => void>();
 
+/** Hook que la capa de sincronización registra para enviar cambios a la nube. */
+type ChangeHook = (prev: AppData, next: AppData) => void;
+let changeHook: ChangeHook | null = null;
+
+export function registerChangeHook(hook: ChangeHook | null) {
+  changeHook = hook;
+}
+
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function notify() {
+  listeners.forEach((l) => l());
 }
 
 export function getState(): AppData {
@@ -26,15 +38,27 @@ export function getState(): AppData {
 }
 
 export function setState(updater: (prev: AppData) => AppData) {
+  const prev = state;
   state = updater(state);
   persist();
-  listeners.forEach((l) => l());
+  notify();
+  if (changeHook) changeHook(prev, state);
 }
 
+/** Sustituye todos los datos y los sincroniza a la nube (restaurar copia, borrado total). */
 export function replaceState(data: AppData) {
+  const prev = state;
   state = { ...EMPTY_DATA, ...data };
   persist();
-  listeners.forEach((l) => l());
+  notify();
+  if (changeHook) changeHook(prev, state);
+}
+
+/** Sustituye los datos SIN avisar a la nube (usado al descargar datos desde la nube). */
+export function replaceStateQuiet(data: AppData) {
+  state = { ...EMPTY_DATA, ...data };
+  persist();
+  notify();
 }
 
 function subscribe(listener: () => void) {

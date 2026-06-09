@@ -1,7 +1,111 @@
 import React, { useRef, useState } from 'react';
 import { useAppData, replaceState } from '../lib/store';
 import { EMPTY_DATA } from '../types';
-import { Card, PageTitle, Btn } from '../components/ui';
+import { getConfig, setConfig } from '../lib/supabase';
+import { useSyncInfo, logout, recargarDesdeNube, subirTodoALaNube } from '../lib/sync';
+import { Card, PageTitle, Btn, Field, inputCls } from '../components/ui';
+
+const NubeCard: React.FC<{ onMsg: (m: string) => void }> = ({ onMsg }) => {
+  const sync = useSyncInfo();
+  const configurada = !!getConfig();
+  const [url, setUrl] = useState('');
+  const [anonKey, setAnonKey] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+
+  const guardarConfig = () => {
+    const u = url.trim().replace(/\/+$/, '');
+    if (!/^https?:\/\/.+/.test(u)) {
+      onMsg('La URL debe empezar por https:// (la encontrarás en Project Settings → API).');
+      return;
+    }
+    setConfig({ url: u, anonKey: anonKey.trim() });
+    location.reload();
+  };
+
+  const desvincular = () => {
+    if (confirm('La app dejará de sincronizar y funcionará solo en este navegador. Los datos de la nube no se borran. ¿Continuar?')) {
+      setConfig(null);
+      location.reload();
+    }
+  };
+
+  const estado: Record<string, string> = {
+    sincronizado: '🟢 Sincronizado',
+    guardando: '🟡 Guardando…',
+    conectando: '🟡 Conectando…',
+    error: `🔴 Error: ${sync.error || ''}`,
+    sin_sesion: '🟡 Sin sesión iniciada',
+    local: '⚪ Solo local',
+  };
+
+  if (!configurada) {
+    return (
+      <Card className="p-5 md:col-span-2">
+        <h3 className="font-semibold text-gray-800 mb-2">☁️ Nube (Supabase)</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Conecta tu proyecto de Supabase para que los datos se guarden en la nube, con acceso desde
+          cualquier dispositivo y protegidos con usuario y contraseña. Encontrarás la URL y la clave en
+          Supabase → Project Settings → API. Antes, ejecuta el script <code>supabase/schema.sql</code> en el
+          SQL Editor (instrucciones en el README).
+        </p>
+        <div className="grid md:grid-cols-2 gap-3 mb-3">
+          <Field label="URL del proyecto">
+            <input className={inputCls} placeholder="https://xxxx.supabase.co" value={url} onChange={(e) => setUrl(e.target.value)} />
+          </Field>
+          <Field label="Clave anónima (anon public key)">
+            <input className={inputCls} placeholder="eyJhbGciOi…" value={anonKey} onChange={(e) => setAnonKey(e.target.value)} />
+          </Field>
+        </div>
+        <Btn onClick={guardarConfig} disabled={!url.trim() || !anonKey.trim()}>
+          Conectar con la nube
+        </Btn>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-5 md:col-span-2">
+      <h3 className="font-semibold text-gray-800 mb-2">☁️ Nube (Supabase)</h3>
+      <p className="text-sm text-gray-600 mb-1">
+        Estado: <strong>{estado[sync.status]}</strong>
+        {sync.email && <span className="text-gray-400"> · sesión: {sync.email}</span>}
+      </p>
+      <p className="text-xs text-gray-400 mb-4">{getConfig()?.url}</p>
+      <div className="flex gap-2 flex-wrap">
+        <Btn
+          variant="secondary"
+          disabled={ocupado || sync.status !== 'sincronizado'}
+          onClick={async () => {
+            setOcupado(true);
+            await recargarDesdeNube();
+            setOcupado(false);
+            onMsg('Datos recargados desde la nube.');
+          }}
+        >
+          ⟳ Recargar desde la nube
+        </Btn>
+        <Btn
+          variant="secondary"
+          disabled={ocupado || (sync.status !== 'sincronizado' && sync.status !== 'error')}
+          onClick={async () => {
+            setOcupado(true);
+            await subirTodoALaNube();
+            setOcupado(false);
+            onMsg('Todos los datos locales se han subido a la nube.');
+          }}
+        >
+          ⬆ Forzar subida de todo
+        </Btn>
+        <Btn variant="secondary" onClick={() => logout()}>
+          Cerrar sesión
+        </Btn>
+        <Btn variant="danger" onClick={desvincular}>
+          Desvincular nube
+        </Btn>
+      </div>
+    </Card>
+  );
+};
 
 const Ajustes: React.FC = () => {
   const data = useAppData();
@@ -64,6 +168,7 @@ const Ajustes: React.FC = () => {
       {msg && <Card className="p-4 mb-4 bg-blue-50 border-blue-200 text-blue-800 text-sm">{msg}</Card>}
 
       <div className="grid md:grid-cols-2 gap-4">
+        <NubeCard onMsg={setMsg} />
         <Card className="p-5">
           <h3 className="font-semibold text-gray-800 mb-2">Copia de seguridad</h3>
           <p className="text-sm text-gray-500 mb-4">

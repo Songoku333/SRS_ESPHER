@@ -32,8 +32,41 @@ liquidación del reparto con proveedores y colaboradores.
 
 ## Dónde se guardan los datos
 
-En el navegador (`localStorage`), sin servidor: nada sale de tu equipo.
-Descarga copias de seguridad desde **Ajustes** con regularidad.
+La app funciona en dos modos:
+
+- **Solo local** (por defecto): los datos viven en el navegador (`localStorage`),
+  nada sale de tu equipo.
+- **Nube (Supabase)**: los datos se guardan en tu proyecto de Supabase,
+  protegidos con usuario y contraseña, y se sincronizan automáticamente entre
+  dispositivos. El navegador sigue guardando una copia local como caché.
+
+En ambos modos puedes descargar copias de seguridad desde **Ajustes**.
+
+## Activar la nube (Supabase) — unos 5 minutos
+
+1. Crea una cuenta gratuita en [supabase.com](https://supabase.com) y un
+   proyecto nuevo (elige región `eu-west` y guarda bien la contraseña de la
+   base de datos, aunque la app no la necesita).
+2. En el proyecto, abre **SQL Editor → New query**, pega el contenido completo
+   de [`supabase/schema.sql`](supabase/schema.sql) y pulsa **Run**. Esto crea
+   las tablas y la seguridad por usuario. Es seguro ejecutarlo varias veces.
+3. En **Authentication → Users → Add user → Create new user**, crea tu usuario
+   con email y contraseña (marca *Auto Confirm User*). Crea uno por cada
+   persona que deba entrar; cada usuario ve solo sus propios datos, así que
+   para compartir la contabilidad usad el mismo usuario.
+4. En **Project Settings → API** copia la **Project URL** y la clave
+   **anon public**.
+5. Abre la app → **Ajustes → Nube (Supabase)**, pega URL y clave y pulsa
+   **Conectar con la nube**. Inicia sesión con el usuario del paso 3.
+
+La primera vez, los datos que ya tuvieras en el navegador **se suben y se
+fusionan** con lo que haya en la nube (no se pierde nada). A partir de ahí,
+cada cambio se guarda solo (verás el indicador «Sincronizado en la nube» abajo
+a la izquierda) y al abrir la app en otro dispositivo aparece todo.
+
+> Alternativa para no configurar nada en pantalla: define
+> `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` al hacer `npm run build` y la
+> app saldrá ya conectada de fábrica.
 
 ## Desarrollo
 
