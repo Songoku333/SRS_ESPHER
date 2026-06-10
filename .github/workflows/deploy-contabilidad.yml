@@ -1,0 +1,52 @@
+name: Publicar SRS Gestión en GitHub Pages
+
+on:
+  push:
+    branches: [main, claude/engineering-accounting-app-803dw4]
+    paths: ['contabilidad/**', '.github/workflows/deploy-contabilidad.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contabilidad/package-lock.json
+      - name: Instalar dependencias
+        working-directory: contabilidad
+        run: npm ci
+      - name: Compilar
+        working-directory: contabilidad
+        run: npm run build
+        env:
+          # Opcionales: defínelas en Settings → Secrets and variables → Actions → Variables
+          # para que la app salga ya conectada a tu Supabase sin configurar nada en pantalla
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: contabilidad/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
