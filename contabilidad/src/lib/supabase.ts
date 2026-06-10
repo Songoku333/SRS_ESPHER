@@ -32,6 +32,32 @@ export function setConfig(cfg: SupabaseConfig | null) {
   localStorage.removeItem('srs-sync-vinculado');
 }
 
+/**
+ * Normaliza lo que el usuario pegue como URL del proyecto.
+ * Acepta la Project URL (https://xxxx.supabase.co), la URL del panel
+ * (https://supabase.com/dashboard/project/xxxx/...) o URLs con rutas de más,
+ * y devuelve siempre https://xxxx.supabase.co. Null si no se reconoce.
+ */
+export function normalizarUrlProyecto(entrada: string): string | null {
+  let s = entrada.trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  // URL del panel: supabase.com/dashboard/project/<ref>/...
+  const m = u.pathname.match(/\/project\/([a-z0-9-]+)/i);
+  if (u.hostname.endsWith('supabase.com') && m) {
+    return `https://${m[1]}.supabase.co`;
+  }
+  if (u.hostname.endsWith('supabase.com')) return null;
+  // Proyecto en supabase.co (o autoalojado): quedarse solo con el origen
+  return u.origin;
+}
+
 let client: SupabaseClient | null = null;
 let clientUrl = '';
 

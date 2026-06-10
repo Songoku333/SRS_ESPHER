@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useAppData, replaceState } from '../lib/store';
 import { EMPTY_DATA } from '../types';
-import { getConfig, setConfig } from '../lib/supabase';
+import { getConfig, setConfig, normalizarUrlProyecto } from '../lib/supabase';
 import { useSyncInfo, logout, recargarDesdeNube, subirTodoALaNube } from '../lib/sync';
 import { Card, PageTitle, Btn, Field, inputCls } from '../components/ui';
 
@@ -13,12 +13,19 @@ const NubeCard: React.FC<{ onMsg: (m: string) => void }> = ({ onMsg }) => {
   const [ocupado, setOcupado] = useState(false);
 
   const guardarConfig = () => {
-    const u = url.trim().replace(/\/+$/, '');
-    if (!/^https?:\/\/.+/.test(u)) {
-      onMsg('La URL debe empezar por https:// (la encontrarás en Project Settings → API).');
+    const u = normalizarUrlProyecto(url);
+    if (!u) {
+      onMsg(
+        'Esa URL no parece la del proyecto. Copia la "Project URL" (https://xxxx.supabase.co) desde Supabase → Project Settings → API.'
+      );
       return;
     }
-    setConfig({ url: u, anonKey: anonKey.trim() });
+    const clave = anonKey.trim();
+    if (!clave.startsWith('eyJ') && !clave.startsWith('sb_publishable_')) {
+      onMsg('Esa clave no parece la "anon public". Cópiala desde Project Settings → API (empieza por eyJ… o sb_publishable_…).');
+      return;
+    }
+    setConfig({ url: u, anonKey: clave });
     location.reload();
   };
 

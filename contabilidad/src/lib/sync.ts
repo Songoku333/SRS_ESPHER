@@ -130,6 +130,12 @@ async function conectar() {
 function mensajeError(e: any): string {
   const msg = String(e?.message || e || 'Error desconocido');
   if (msg.includes('Failed to fetch')) return 'Sin conexión con Supabase.';
+  if (msg.includes('Invalid path')) {
+    return 'La URL del proyecto no es correcta. Desvincula la nube y vuelve a conectar con la "Project URL" (https://xxxx.supabase.co) de Project Settings → API.';
+  }
+  if (msg.includes('Invalid API key') || msg.includes('No API key')) {
+    return 'La clave anónima no es correcta. Desvincula la nube y vuelve a conectar con la clave "anon public" de Project Settings → API.';
+  }
   if (msg.toLowerCase().includes('relation') && msg.includes('does not exist')) {
     return 'Faltan las tablas: ejecuta supabase/schema.sql en el SQL Editor de tu proyecto.';
   }
