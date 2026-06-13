@@ -20,7 +20,10 @@ export function getConfig(): SupabaseConfig | null {
   }
   const env = (import.meta as any).env || {};
   if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) {
-    return { url: env.VITE_SUPABASE_URL, anonKey: env.VITE_SUPABASE_ANON_KEY };
+    // Las variables del build pueden traer espacios, salto de línea o barra final
+    // al copiarlas; se limpian igual que la URL escrita a mano.
+    const url = normalizarUrlProyecto(String(env.VITE_SUPABASE_URL));
+    if (url) return { url, anonKey: String(env.VITE_SUPABASE_ANON_KEY).trim() };
   }
   return null;
 }
