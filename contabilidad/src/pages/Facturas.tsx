@@ -3,6 +3,7 @@ import { useAppData, setState, uid, ensureContacto } from '../lib/store';
 import { Factura, EstadoFactura } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
+import GenerarProyectoModal from '../components/GenerarProyectoModal';
 
 interface FormFactura {
   numero: string;
@@ -28,6 +29,7 @@ const Facturas: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState<Factura | null>(null);
+  const [generando, setGenerando] = useState<Factura | null>(null);
   const [form, setForm] = useState<FormFactura>(formVacio());
 
   function formVacio(): FormFactura {
@@ -185,6 +187,11 @@ const Facturas: React.FC = () => {
                       ✓ Cobrada
                     </Btn>
                   )}
+                  {!f.proyectoId && f.estado !== 'anulada' && (
+                    <Btn variant="ghost" onClick={() => setGenerando(f)} title="Crear proyecto con estimación de equipo, horas y gastos">
+                      ⚙ Generar proyecto
+                    </Btn>
+                  )}
                   <Btn variant="ghost" onClick={() => abrir(f)}>
                     Editar
                   </Btn>
@@ -272,6 +279,8 @@ const Facturas: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {generando && <GenerarProyectoModal factura={generando} onClose={() => setGenerando(null)} />}
     </div>
   );
 };
