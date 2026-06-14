@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useAppData, setState, uid } from '../lib/store';
 import { Liquidacion } from '../types';
-import { resumenRepartos, ResumenReparto } from '../lib/calculos';
+import { resumenRepartos, ResumenReparto, Rango } from '../lib/calculos';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
 
@@ -11,9 +11,37 @@ const Liquidaciones: React.FC = () => {
   const [importe, setImporte] = useState('');
   const [fecha, setFecha] = useState(hoy());
   const [pagadaYa, setPagadaYa] = useState(false);
+  const [rango, setRango] = useState<Rango>({ desde: '', hasta: '' });
 
-  const resumen = useMemo(() => resumenRepartos(data), [data]);
+  const usarRango = rango.desde || rango.hasta ? rango : undefined;
+  const resumen = useMemo(() => resumenRepartos(data, usarRango), [data, rango]);
   const nombre = (id: string) => data.contactos.find((c) => c.id === id)?.nombre || '—';
+
+  const anyo = new Date().getFullYear();
+
+  /** Registra de golpe, como pendientes, todas las liquidaciones del periodo con saldo a favor. */
+  const registrarTodasPendientes = () => {
+    const aRegistrar = resumen.filter((r) => r.pendiente > 0.005);
+    if (aRegistrar.length === 0) return;
+    if (
+      !confirm(
+        `Se registrarán ${aRegistrar.length} liquidaciones pendientes por un total de ` +
+          `${fmtEur(aRegistrar.reduce((s, r) => s + r.pendiente, 0))}. Podrás pagarlas o conciliarlas después. ¿Continuar?`
+      )
+    )
+      return;
+    const fechaLiq = rango.hasta || hoy();
+    const nuevas: Liquidacion[] = aRegistrar.map((r) => ({
+      id: uid(),
+      proyectoId: r.proyecto.id,
+      contactoId: r.contactoId,
+      concepto: `Liquidación ${r.proyecto.codigo} · ${nombre(r.contactoId)}`,
+      importe: Math.round(r.pendiente * 100) / 100,
+      fecha: fechaLiq,
+      estado: 'pendiente' as const,
+    }));
+    setState((p) => ({ ...p, liquidaciones: [...p.liquidaciones, ...nuevas] }));
+  };
 
   const abrirRegistro = (r: ResumenReparto) => {
     setRegistrando(r);
@@ -72,12 +100,39 @@ const Liquidaciones: React.FC = () => {
         subtitle={`${fmtEur(totalPendiente)} devengado pendiente de liquidar con colaboradores y proveedores`}
       />
 
+      <Card className="p-4 mb-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-600 mb-1">Cobros desde</span>
+            <input type="date" className={inputCls} value={rango.desde} onChange={(e) => setRango({ ...rango, desde: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-600 mb-1">Hasta</span>
+            <input type="date" className={inputCls} value={rango.hasta} onChange={(e) => setRango({ ...rango, hasta: e.target.value })} />
+          </label>
+          <div className="flex gap-2">
+            <Btn variant="secondary" onClick={() => setRango({ desde: `${anyo}-01-01`, hasta: `${anyo}-12-31` })}>
+              {anyo}
+            </Btn>
+            <Btn variant="secondary" onClick={() => setRango({ desde: '', hasta: '' })}>
+              Todo
+            </Btn>
+          </div>
+          <div className="ml-auto">
+            <Btn onClick={registrarTodasPendientes} disabled={!resumen.some((r) => r.pendiente > 0.005)}>
+              Registrar pendientes del periodo
+            </Btn>
+          </div>
+        </div>
+      </Card>
+
       <Card className="mb-6">
         <div className="px-4 pt-4">
           <h3 className="font-semibold text-gray-800">Estado del reparto por proyecto</h3>
           <p className="text-xs text-gray-500 mt-1 mb-2">
-            Calculado automáticamente: % de reparto sobre la base imponible <strong>cobrada</strong> de cada
-            proyecto, menos lo ya liquidado.
+            Calculado automáticamente: % de reparto sobre la base imponible <strong>cobrada</strong>
+            {usarRango ? ' en el periodo seleccionado' : ''}, menos lo ya liquidado. Devenga según los cobros,
+            que puedes registrar cruzando el banco con las facturas.
           </p>
         </div>
         {conReparto.length === 0 ? (

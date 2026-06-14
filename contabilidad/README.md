@@ -18,12 +18,18 @@ liquidación del reparto con proveedores y colaboradores.
   IVA/IRPF y total calculado. Se marcan cobradas a mano o al conciliar el banco.
 - **Gastos**: facturas recibidas y gastos por categoría, imputables a proyecto.
 - **Banco**: movimientos de cuenta, de tarjeta, transferencias emitidas y
-  recibidas. Conciliación guiada: una entrada propone facturas pendientes de
-  cobro; una salida propone gastos y liquidaciones pendientes. Al conciliar, el
-  documento se marca cobrado/pagado automáticamente.
-- **Liquidaciones**: calcula solo lo devengado por cada colaborador/proveedor
-  según lo cobrado de cada proyecto, lo ya liquidado y lo pendiente; registra
-  pagos y concíliarlos con el banco.
+  recibidas. **Conciliación automática**: cruza de una vez los movimientos sin
+  conciliar con las facturas (entradas), gastos y liquidaciones (salidas) por
+  importe y cercanía de fecha, y los marca cobrados/pagados. También conciliación
+  guiada uno a uno, y convertir un movimiento de tarjeta o transferencia emitida
+  en un gasto imputable a proyecto.
+- **Liquidaciones**: calcula lo devengado por cada colaborador/proveedor según lo
+  cobrado de cada proyecto, lo ya liquidado y lo pendiente; filtra por periodo de
+  cobros y registra en lote las liquidaciones pendientes del periodo.
+- **Rentabilidad**: beneficio neto por proyecto y global cruzando facturas,
+  gastos imputados y liquidaciones. Por cada proyecto/factura muestra facturado,
+  cobrado, costes, reparto, beneficio estimado, margen %, beneficio en caja y lo
+  que queda pendiente de cobrar, pagar o liquidar. Filtrable por fechas.
 - **Importar Excel**: sube tu hoja de facturas o los extractos bancarios
   (xlsx, xls, csv). Detecta las columnas automáticamente (puedes corregir el
   mapeo), acepta importes en formato español (1.234,56 €), fechas dd/mm/aaaa o
