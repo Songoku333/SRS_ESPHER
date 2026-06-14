@@ -46,12 +46,17 @@ export interface Oferta {
   notas?: string;
 }
 
-/** Reparto de un proyecto con un proveedor o colaborador */
+/** Reparto de un proyecto con un proveedor o colaborador.
+ *  `valor` es el % (si el proyecto reparte por porcentaje) o las horas (si reparte
+ *  por horas). `porcentaje` se mantiene por compatibilidad con datos antiguos. */
 export interface Reparto {
   contactoId: string;
-  porcentaje: number; // % sobre la base imponible cobrada del proyecto
+  valor?: number;
+  porcentaje?: number; // legado
   descripcion?: string;
 }
+
+export type ModoReparto = 'porcentaje' | 'horas';
 
 export type EstadoProyecto = 'activo' | 'cerrado';
 
@@ -65,6 +70,10 @@ export interface Proyecto {
   fechaInicio: string;
   estado: EstadoProyecto;
   repartos: Reparto[];
+  modoReparto?: ModoReparto; // por defecto 'porcentaje'
+  comercialId?: string; // contacto que percibe la comisión comercial
+  comercialPct?: number; // por defecto 10
+  gastosGeneralesPct?: number; // por defecto 20
   notas?: string;
 }
 
@@ -84,18 +93,22 @@ export interface Factura {
   estado: EstadoFactura;
   vencimiento?: string;
   fechaCobro?: string;
+  liquidada?: boolean; // reparto y pago de gastos completado y dado por bueno
 }
 
 export type EstadoGasto = 'pendiente' | 'pagado';
 
 export const CATEGORIAS_GASTO = [
-  'Proveedores / Subcontratación',
+  'Subcontratación / Ingeniería externa',
+  'OCA / Inspecciones',
+  'Visados y colegios',
+  'Tasas y licencias administrativas',
+  'Desplazamientos y dietas',
   'Colaboradores',
   'Software y licencias',
-  'Seguros y tasas',
-  'Suministros',
-  'Desplazamientos',
+  'Seguros (RC, decenal)',
   'Material y equipos',
+  'Suministros y oficina',
   'Impuestos',
   'Otros',
 ] as const;
@@ -112,6 +125,7 @@ export interface Gasto {
   ivaPct: number;
   total: number;
   proyectoId?: string;
+  facturaId?: string; // gasto imputado a una factura concreta (para la liquidación)
   estado: EstadoGasto;
   fechaPago?: string;
 }
@@ -149,7 +163,9 @@ export type EstadoLiquidacion = 'pendiente' | 'pagada';
 export interface Liquidacion {
   id: string;
   proyectoId: string;
+  facturaId?: string; // factura a la que corresponde la liquidación
   contactoId: string;
+  rol?: 'colaborador' | 'comercial';
   concepto: string;
   importe: number;
   fecha: string;

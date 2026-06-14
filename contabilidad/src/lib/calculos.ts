@@ -1,4 +1,5 @@
-import { AppData, Proyecto } from '../types';
+import { AppData } from '../types';
+import { totalPendienteLiquidar } from './liquidacion';
 
 export interface Rango {
   desde: string; // ISO yyyy-mm-dd (vacío = sin límite)
@@ -32,48 +33,6 @@ export function baseCobradaProyecto(data: AppData, proyectoId: string, rango?: R
     .reduce((s, f) => s + f.base, 0);
 }
 
-export interface ResumenReparto {
-  proyecto: Proyecto;
-  contactoId: string;
-  porcentaje: number;
-  devengado: number; // % sobre base cobrada
-  liquidado: number; // liquidaciones pagadas
-  comprometido: number; // liquidaciones pendientes
-  pendiente: number; // devengado - liquidado - comprometido
-}
-
-/**
- * Calcula, para cada reparto de cada proyecto, lo devengado, liquidado y pendiente.
- * Con `rango`, devenga solo sobre lo cobrado en ese periodo y cuenta solo las
- * liquidaciones con fecha dentro del periodo (para proponer liquidaciones por tramos).
- */
-export function resumenRepartos(data: AppData, rango?: Rango): ResumenReparto[] {
-  const out: ResumenReparto[] = [];
-  for (const p of data.proyectos) {
-    const cobrado = baseCobradaProyecto(data, p.id, rango);
-    for (const r of p.repartos) {
-      const devengado = (cobrado * r.porcentaje) / 100;
-      const liqs = data.liquidaciones.filter(
-        (l) => l.proyectoId === p.id && l.contactoId === r.contactoId && enRango(l.fecha, rango)
-      );
-      const liquidado = liqs.filter((l) => l.estado === 'pagada').reduce((s, l) => s + l.importe, 0);
-      const comprometido = liqs
-        .filter((l) => l.estado === 'pendiente')
-        .reduce((s, l) => s + l.importe, 0);
-      out.push({
-        proyecto: p,
-        contactoId: r.contactoId,
-        porcentaje: r.porcentaje,
-        devengado,
-        liquidado,
-        comprometido,
-        pendiente: devengado - liquidado - comprometido,
-      });
-    }
-  }
-  return out;
-}
-
 export interface KPIs {
   facturadoAnyo: number;
   cobradoAnyo: number;
@@ -102,10 +61,7 @@ export function calcularKPIs(data: AppData, anyo: number): KPIs {
   const gastosPendientes = data.gastos
     .filter((g) => g.estado === 'pendiente')
     .reduce((s, g) => s + g.total, 0);
-  const liquidacionesPendientes = resumenRepartos(data).reduce(
-    (s, r) => s + Math.max(0, r.pendiente) + r.comprometido,
-    0
-  );
+  const liquidacionesPendientes = totalPendienteLiquidar(data);
   const ofertasAbiertas = data.ofertas.filter(
     (o) => o.estado === 'borrador' || o.estado === 'enviada'
   );

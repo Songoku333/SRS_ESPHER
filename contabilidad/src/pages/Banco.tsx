@@ -69,7 +69,7 @@ const Banco: React.FC = () => {
 
   // Convertir movimiento en gasto
   const [gastoDesde, setGastoDesde] = useState<MovimientoBancario | null>(null);
-  const [gastoForm, setGastoForm] = useState({ proveedor: '', categoria: 'Otros' as CategoriaGasto, proyectoId: '', ivaPct: '21' });
+  const [gastoForm, setGastoForm] = useState({ proveedor: '', categoria: 'Otros' as CategoriaGasto, proyectoId: '', facturaId: '', ivaPct: '21' });
 
   const abrir = (m?: MovimientoBancario) => {
     if (m) {
@@ -146,8 +146,9 @@ const Banco: React.FC = () => {
     setGastoDesde(m);
     setGastoForm({
       proveedor: '',
-      categoria: m.tipo === 'tarjeta' ? 'Otros' : 'Proveedores / Subcontratación',
+      categoria: m.tipo === 'tarjeta' ? 'Otros' : 'Subcontratación / Ingeniería externa',
       proyectoId: '',
+      facturaId: '',
       ivaPct: '21',
     });
   };
@@ -177,6 +178,7 @@ const Banco: React.FC = () => {
           ivaPct,
           total,
           proyectoId: gastoForm.proyectoId || undefined,
+          facturaId: gastoForm.facturaId || undefined,
           estado: 'pagado' as const,
           fechaPago: m.fecha,
         },
@@ -466,16 +468,30 @@ const Banco: React.FC = () => {
                 <input type="number" step="0.5" className={inputCls} value={gastoForm.ivaPct} onChange={(e) => setGastoForm({ ...gastoForm, ivaPct: e.target.value })} />
               </Field>
             </div>
-            <Field label="Proyecto (para imputar el coste)">
-              <select className={inputCls} value={gastoForm.proyectoId} onChange={(e) => setGastoForm({ ...gastoForm, proyectoId: e.target.value })}>
-                <option value="">— Sin proyecto —</option>
-                {data.proyectos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo} · {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Proyecto (para imputar el coste)">
+                <select className={inputCls} value={gastoForm.proyectoId} onChange={(e) => setGastoForm({ ...gastoForm, proyectoId: e.target.value, facturaId: '' })}>
+                  <option value="">— Sin proyecto —</option>
+                  {data.proyectos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.codigo} · {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Factura (descontar antes del reparto)">
+                <select className={inputCls} value={gastoForm.facturaId} onChange={(e) => setGastoForm({ ...gastoForm, facturaId: e.target.value })} disabled={!gastoForm.proyectoId}>
+                  <option value="">— Sin factura concreta —</option>
+                  {data.facturas
+                    .filter((f) => f.proyectoId === gastoForm.proyectoId && f.estado !== 'anulada')
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.numero} · {fmtEur(f.base)}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            </div>
             <p className="text-xs text-gray-400">
               Se creará un gasto ya pagado y el movimiento quedará conciliado con él.
             </p>
