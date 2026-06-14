@@ -289,14 +289,16 @@ const Proyectos: React.FC = () => {
               </p>
               {form.repartos.map((r, i) => (
                 <div key={i} className="flex gap-2 mb-2 items-center">
-                  <input
-                    className={`${inputCls} flex-1`}
-                    placeholder="Colaborador"
-                    list="colaboradores-proy"
-                    value={r.contactoNombre}
-                    onChange={(e) => setReparto(i, 'contactoNombre', e.target.value)}
-                  />
-                  <div className="relative w-28">
+                  <div className="flex-1 min-w-0">
+                    <input
+                      className={inputCls}
+                      placeholder="Colaborador"
+                      list="colaboradores-proy"
+                      value={r.contactoNombre}
+                      onChange={(e) => setReparto(i, 'contactoNombre', e.target.value)}
+                    />
+                  </div>
+                  <div className="w-24 flex-none">
                     <input
                       type="number"
                       step="0.1"
@@ -307,12 +309,14 @@ const Proyectos: React.FC = () => {
                     />
                   </div>
                   <span className="text-xs text-gray-400 w-4">{unidad}</span>
-                  <input
-                    className={`${inputCls} flex-1`}
-                    placeholder="Concepto (opcional)"
-                    value={r.descripcion}
-                    onChange={(e) => setReparto(i, 'descripcion', e.target.value)}
-                  />
+                  <div className="flex-1 min-w-0">
+                    <input
+                      className={inputCls}
+                      placeholder="Concepto (opcional)"
+                      value={r.descripcion}
+                      onChange={(e) => setReparto(i, 'descripcion', e.target.value)}
+                    />
+                  </div>
                   <button
                     className="text-red-500 hover:text-red-700 px-1"
                     onClick={() => setForm({ ...form, repartos: form.repartos.filter((_, j) => j !== i) })}

@@ -1,0 +1,210 @@
+import { CategoriaGasto, LineaServicio } from '../types';
+
+/**
+ * Plantillas de estimación por línea de servicio. Cifras ORIENTATIVAS basadas en
+ * ratios de mercado de ingeniería/consultoría en España (honorarios liberalizados
+ * desde la Ley Ómnibus 2009; visado colegial ~0,6–2,5% del PEM con mínimos).
+ * Todo es editable en el momento de generar el proyecto.
+ */
+export interface RolPlantilla {
+  nombre: string;
+  pesoHoras: number; // % del total de horas estimadas
+}
+
+export interface GastoPlantilla {
+  concepto: string;
+  categoria: CategoriaGasto;
+  modo: 'pct' | 'fijo'; // % sobre la base imponible o importe fijo
+  valor: number;
+}
+
+export interface Plantilla {
+  eurPorHora: number; // tarifa media efectiva para estimar las horas totales
+  comercialPct: number;
+  generalesPct: number;
+  roles: RolPlantilla[];
+  gastos: GastoPlantilla[];
+}
+
+export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
+  'Ingeniería MEP': {
+    eurPorHora: 45,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Ingeniero proyectista', pesoHoras: 45 },
+      { nombre: 'Modelador BIM / Delineante', pesoHoras: 30 },
+      { nombre: 'Director / Revisor de proyecto', pesoHoras: 15 },
+      { nombre: 'Tramitador administrativo', pesoHoras: 10 },
+    ],
+    gastos: [
+      { concepto: 'Visado colegial', categoria: 'Visados y colegios', modo: 'pct', valor: 1.0 },
+      { concepto: 'Seguro RC del proyecto', categoria: 'Seguros (RC, decenal)', modo: 'fijo', valor: 120 },
+      { concepto: 'Copias, impresión y encuadernación', categoria: 'Suministros y oficina', modo: 'fijo', valor: 60 },
+      { concepto: 'Desplazamientos a obra', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 1.5 },
+    ],
+  },
+  Legalizaciones: {
+    eurPorHora: 42,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Ingeniero', pesoHoras: 50 },
+      { nombre: 'Tramitador administrativo', pesoHoras: 25 },
+      { nombre: 'Director / Firma técnica', pesoHoras: 15 },
+      { nombre: 'Apoyo técnico', pesoHoras: 10 },
+    ],
+    gastos: [
+      { concepto: 'OCA / inspección', categoria: 'OCA / Inspecciones', modo: 'fijo', valor: 350 },
+      { concepto: 'Tasas de la administración (Industria)', categoria: 'Tasas y licencias administrativas', modo: 'fijo', valor: 120 },
+      { concepto: 'Visado colegial', categoria: 'Visados y colegios', modo: 'pct', valor: 1.0 },
+      { concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.0 },
+    ],
+  },
+  'Auditoría energética': {
+    eurPorHora: 48,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Auditor energético', pesoHoras: 45 },
+      { nombre: 'Técnico de campo / mediciones', pesoHoras: 30 },
+      { nombre: 'Analista de datos', pesoHoras: 25 },
+    ],
+    gastos: [
+      { concepto: 'Alquiler de equipos de medición', categoria: 'Material y equipos', modo: 'fijo', valor: 250 },
+      { concepto: 'Desplazamientos y visitas', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 3.0 },
+      { concepto: 'Registro / certificación', categoria: 'Tasas y licencias administrativas', modo: 'fijo', valor: 90 },
+    ],
+  },
+  'Modelado y simulación energética': {
+    eurPorHora: 50,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Modelador energético (HULC/IDA/DesignBuilder)', pesoHoras: 50 },
+      { nombre: 'Ingeniero', pesoHoras: 30 },
+      { nombre: 'QA / Revisión', pesoHoras: 20 },
+    ],
+    gastos: [
+      { concepto: 'Licencias de software de simulación', categoria: 'Software y licencias', modo: 'pct', valor: 4.0 },
+      { concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 1.0 },
+    ],
+  },
+  'Consultoría fondos inmobiliarios': {
+    eurPorHora: 65,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Consultor senior', pesoHoras: 45 },
+      { nombre: 'Analista técnico', pesoHoras: 35 },
+      { nombre: 'Due diligence / Soporte', pesoHoras: 20 },
+    ],
+    gastos: [
+      { concepto: 'Desplazamientos y visitas a activos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 3.0 },
+      { concepto: 'Maquetación de informes', categoria: 'Suministros y oficina', modo: 'fijo', valor: 150 },
+    ],
+  },
+  'Consultoría residencial': {
+    eurPorHora: 55,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Consultor senior', pesoHoras: 40 },
+      { nombre: 'Técnico', pesoHoras: 40 },
+      { nombre: 'Soporte', pesoHoras: 20 },
+    ],
+    gastos: [
+      { concepto: 'Desplazamientos y visitas', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.5 },
+      { concepto: 'Informes', categoria: 'Suministros y oficina', modo: 'fijo', valor: 120 },
+    ],
+  },
+  'Clima y sostenibilidad': {
+    eurPorHora: 55,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Consultor sostenibilidad (BREEAM/LEED)', pesoHoras: 45 },
+      { nombre: 'Técnico', pesoHoras: 35 },
+      { nombre: 'QA / Revisión', pesoHoras: 20 },
+    ],
+    gastos: [
+      { concepto: 'Tasas de certificación (BREEAM/LEED/Passivhaus)', categoria: 'Tasas y licencias administrativas', modo: 'fijo', valor: 400 },
+      { concepto: 'Registro', categoria: 'Tasas y licencias administrativas', modo: 'fijo', valor: 150 },
+      { concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.0 },
+    ],
+  },
+  Otros: {
+    eurPorHora: 45,
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Ingeniero / Consultor', pesoHoras: 60 },
+      { nombre: 'Apoyo técnico', pesoHoras: 40 },
+    ],
+    gastos: [{ concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.0 }],
+  },
+};
+
+export interface RolEstimado {
+  nombre: string;
+  horas: number;
+}
+export interface GastoEstimado {
+  concepto: string;
+  categoria: CategoriaGasto;
+  base: number;
+}
+export interface Estimacion {
+  linea: LineaServicio;
+  eurPorHora: number;
+  totalHoras: number;
+  comercialPct: number;
+  generalesPct: number;
+  roles: RolEstimado[];
+  gastos: GastoEstimado[];
+}
+
+const r0 = (n: number) => Math.round(n);
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Genera una estimación (horas por rol y gastos típicos) para una línea y una base imponible. */
+export function estimarProyecto(linea: LineaServicio, base: number, eurPorHoraOverride?: number): Estimacion {
+  const pl = PLANTILLAS[linea] ?? PLANTILLAS['Otros'];
+  const eurPorHora = eurPorHoraOverride && eurPorHoraOverride > 0 ? eurPorHoraOverride : pl.eurPorHora;
+  const totalHoras = base > 0 ? r0(base / eurPorHora) : 0;
+  const roles: RolEstimado[] = pl.roles.map((rol) => ({
+    nombre: rol.nombre,
+    horas: r0((totalHoras * rol.pesoHoras) / 100),
+  }));
+  const gastos: GastoEstimado[] = pl.gastos.map((g) => ({
+    concepto: g.concepto,
+    categoria: g.categoria,
+    base: g.modo === 'pct' ? r2((base * g.valor) / 100) : g.valor,
+  }));
+  return {
+    linea,
+    eurPorHora,
+    totalHoras,
+    comercialPct: pl.comercialPct,
+    generalesPct: pl.generalesPct,
+    roles,
+    gastos,
+  };
+}
+
+/** Adivina la línea de servicio a partir del concepto/título de la factura. */
+export function adivinarLinea(texto: string): LineaServicio {
+  const t = (texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const has = (...ws: string[]) => ws.some((w) => t.includes(w));
+  if (has('legaliz', 'puesta en marcha', 'boletin', 'oca', 'industria')) return 'Legalizaciones';
+  if (has('auditoria energetica', 'auditoria', 'certificado energetico', 'cee')) return 'Auditoría energética';
+  if (has('simulacion', 'modelado', 'hulc', 'calener', 'designbuilder', 'ida ice')) return 'Modelado y simulación energética';
+  if (has('fondo', 'due diligence', 'inversion', 'socimi', 'cartera', 'activos')) return 'Consultoría fondos inmobiliarios';
+  if (has('residencia', 'residencial', 'senior living', 'flex living', 'coliving')) return 'Consultoría residencial';
+  if (has('sostenib', 'breeam', 'leed', 'passivhaus', 'esg', 'descarboniz', 'clima')) return 'Clima y sostenibilidad';
+  if (has('mep', 'climatizacion', 'electric', 'fontaneria', 'pci', 'instalacion', 'hvac')) return 'Ingeniería MEP';
+  return 'Otros';
+}

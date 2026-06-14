@@ -17,6 +17,11 @@ liquidación del reparto con proveedores y colaboradores.
   (hasta 6 colaboradores, por % o por horas).
 - **Facturas**: importadas desde tu Excel de facturación o creadas a mano, con
   IVA/IRPF y total calculado. Se marcan cobradas a mano o al conciliar el banco.
+  Desde cada factura sin proyecto puedes **generar un proyecto con estimación**:
+  según el tipo de proyecto (línea de servicio) y el importe, propone el equipo y
+  las horas de cada rol y los gastos típicos (visado, OCA, desplazamientos,
+  licencias…), todo como borrador editable. Las cifras son orientativas (en España
+  los honorarios están liberalizados desde la Ley Ómnibus 2009) y se ajustan luego.
 - **Gastos**: facturas recibidas y gastos por categoría, imputables a proyecto.
 - **Banco**: movimientos de cuenta, de tarjeta, transferencias emitidas y
   recibidas. **Conciliación automática**: cruza de una vez los movimientos sin
