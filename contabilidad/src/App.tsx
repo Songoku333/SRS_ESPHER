@@ -9,6 +9,7 @@ import Facturas from './pages/Facturas';
 import Gastos from './pages/Gastos';
 import Banco from './pages/Banco';
 import Liquidaciones from './pages/Liquidaciones';
+import Rentabilidad from './pages/Rentabilidad';
 import Contactos from './pages/Contactos';
 import Importar from './pages/Importar';
 import Ajustes from './pages/Ajustes';
@@ -21,6 +22,7 @@ const NAV: { page: Page; label: string; icon: string }[] = [
   { page: 'gastos', label: 'Gastos', icon: '💳' },
   { page: 'banco', label: 'Banco', icon: '🏦' },
   { page: 'liquidaciones', label: 'Liquidaciones', icon: '🤝' },
+  { page: 'rentabilidad', label: 'Rentabilidad', icon: '📈' },
   { page: 'contactos', label: 'Contactos', icon: '👥' },
   { page: 'importar', label: 'Importar Excel', icon: '⬆️' },
   { page: 'ajustes', label: 'Ajustes', icon: '⚙️' },
@@ -60,6 +62,8 @@ const App: React.FC = () => {
         return <Banco />;
       case 'liquidaciones':
         return <Liquidaciones />;
+      case 'rentabilidad':
+        return <Rentabilidad />;
       case 'contactos':
         return <Contactos />;
       case 'importar':

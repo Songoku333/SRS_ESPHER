@@ -1,4 +1,17 @@
-import { AppData, Liquidacion, Proyecto } from '../types';
+import { AppData, Proyecto } from '../types';
+
+export interface Rango {
+  desde: string; // ISO yyyy-mm-dd (vacío = sin límite)
+  hasta: string;
+}
+
+export function enRango(fecha: string | undefined, r?: Rango): boolean {
+  if (!r) return true;
+  if (!fecha) return false;
+  if (r.desde && fecha < r.desde) return false;
+  if (r.hasta && fecha > r.hasta) return false;
+  return true;
+}
 
 /** Total facturado (base) de un proyecto, excluyendo anuladas. */
 export function baseFacturadaProyecto(data: AppData, proyectoId: string): number {
@@ -7,10 +20,15 @@ export function baseFacturadaProyecto(data: AppData, proyectoId: string): number
     .reduce((s, f) => s + f.base, 0);
 }
 
-/** Base cobrada de un proyecto (facturas en estado cobrada). */
-export function baseCobradaProyecto(data: AppData, proyectoId: string): number {
+/** Base cobrada de un proyecto (facturas en estado cobrada), opcionalmente dentro de un rango. */
+export function baseCobradaProyecto(data: AppData, proyectoId: string, rango?: Rango): number {
   return data.facturas
-    .filter((f) => f.proyectoId === proyectoId && f.estado === 'cobrada')
+    .filter(
+      (f) =>
+        f.proyectoId === proyectoId &&
+        f.estado === 'cobrada' &&
+        enRango(f.fechaCobro || f.fecha, rango)
+    )
     .reduce((s, f) => s + f.base, 0);
 }
 
@@ -24,15 +42,19 @@ export interface ResumenReparto {
   pendiente: number; // devengado - liquidado - comprometido
 }
 
-/** Calcula, para cada reparto de cada proyecto, lo devengado, liquidado y pendiente. */
-export function resumenRepartos(data: AppData): ResumenReparto[] {
+/**
+ * Calcula, para cada reparto de cada proyecto, lo devengado, liquidado y pendiente.
+ * Con `rango`, devenga solo sobre lo cobrado en ese periodo y cuenta solo las
+ * liquidaciones con fecha dentro del periodo (para proponer liquidaciones por tramos).
+ */
+export function resumenRepartos(data: AppData, rango?: Rango): ResumenReparto[] {
   const out: ResumenReparto[] = [];
   for (const p of data.proyectos) {
-    const cobrado = baseCobradaProyecto(data, p.id);
+    const cobrado = baseCobradaProyecto(data, p.id, rango);
     for (const r of p.repartos) {
       const devengado = (cobrado * r.porcentaje) / 100;
       const liqs = data.liquidaciones.filter(
-        (l) => l.proyectoId === p.id && l.contactoId === r.contactoId
+        (l) => l.proyectoId === p.id && l.contactoId === r.contactoId && enRango(l.fecha, rango)
       );
       const liquidado = liqs.filter((l) => l.estado === 'pagada').reduce((s, l) => s + l.importe, 0);
       const comprometido = liqs

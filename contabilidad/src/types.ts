@@ -185,6 +185,7 @@ export type Page =
   | 'gastos'
   | 'banco'
   | 'liquidaciones'
+  | 'rentabilidad'
   | 'contactos'
   | 'importar'
   | 'ajustes';
