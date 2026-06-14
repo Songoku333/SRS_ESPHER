@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAppData, setState, uid, ensureContacto } from '../lib/store';
-import { Proyecto, EstadoProyecto, LineaServicio, LINEAS_SERVICIO, Reparto } from '../types';
-import { fmtEur, fmtDate, hoy } from '../lib/format';
+import { Proyecto, EstadoProyecto, LineaServicio, LINEAS_SERVICIO, Reparto, ModoReparto } from '../types';
+import { fmtEur, hoy } from '../lib/format';
 import { baseFacturadaProyecto, baseCobradaProyecto } from '../lib/calculos';
+import { repartoValor } from '../lib/liquidacion';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
 
 interface FormProyecto {
@@ -13,7 +14,11 @@ interface FormProyecto {
   presupuesto: string;
   fechaInicio: string;
   estado: EstadoProyecto;
-  repartos: { contactoNombre: string; porcentaje: string; descripcion: string }[];
+  modoReparto: ModoReparto;
+  comercialNombre: string;
+  comercialPct: string;
+  gastosGeneralesPct: string;
+  repartos: { contactoNombre: string; valor: string; descripcion: string }[];
   notas: string;
 }
 
@@ -32,12 +37,16 @@ const Proyectos: React.FC = () => {
       presupuesto: '',
       fechaInicio: hoy(),
       estado: 'activo',
+      modoReparto: 'porcentaje',
+      comercialNombre: '',
+      comercialPct: '10',
+      gastosGeneralesPct: '20',
       repartos: [],
       notas: '',
     };
   }
 
-  const nombreContacto = (id: string) => data.contactos.find((c) => c.id === id)?.nombre || '—';
+  const nombreContacto = (id?: string) => (id ? data.contactos.find((c) => c.id === id)?.nombre || '—' : '');
 
   const abrir = (p?: Proyecto) => {
     if (p) {
@@ -50,9 +59,13 @@ const Proyectos: React.FC = () => {
         presupuesto: String(p.presupuesto),
         fechaInicio: p.fechaInicio,
         estado: p.estado,
+        modoReparto: p.modoReparto ?? 'porcentaje',
+        comercialNombre: nombreContacto(p.comercialId),
+        comercialPct: String(p.comercialPct ?? 10),
+        gastosGeneralesPct: String(p.gastosGeneralesPct ?? 20),
         repartos: p.repartos.map((r) => ({
           contactoNombre: nombreContacto(r.contactoId),
-          porcentaje: String(r.porcentaje),
+          valor: String(repartoValor(r)),
           descripcion: r.descripcion || '',
         })),
         notas: p.notas || '',
@@ -66,11 +79,15 @@ const Proyectos: React.FC = () => {
 
   const guardar = () => {
     const clienteId = ensureContacto(form.clienteNombre, 'cliente');
+    const comercialId = form.comercialNombre.trim()
+      ? ensureContacto(form.comercialNombre, 'colaborador')
+      : undefined;
     const repartos: Reparto[] = form.repartos
-      .filter((r) => r.contactoNombre.trim() && parseFloat(r.porcentaje) > 0)
+      .filter((r) => r.contactoNombre.trim() && parseFloat(r.valor) > 0)
+      .slice(0, 6)
       .map((r) => ({
         contactoId: ensureContacto(r.contactoNombre, 'colaborador'),
-        porcentaje: parseFloat(r.porcentaje),
+        valor: parseFloat(r.valor),
         descripcion: r.descripcion,
       }));
     const base = {
@@ -81,6 +98,10 @@ const Proyectos: React.FC = () => {
       presupuesto: parseFloat(form.presupuesto) || 0,
       fechaInicio: form.fechaInicio,
       estado: form.estado,
+      modoReparto: form.modoReparto,
+      comercialId,
+      comercialPct: parseFloat(form.comercialPct) || 0,
+      gastosGeneralesPct: parseFloat(form.gastosGeneralesPct) || 0,
       repartos,
       notas: form.notas,
     };
@@ -105,14 +126,21 @@ const Proyectos: React.FC = () => {
     }
   };
 
-  const totalPct = form.repartos.reduce((s, r) => s + (parseFloat(r.porcentaje) || 0), 0);
+  const unidad = form.modoReparto === 'horas' ? 'h' : '%';
+  const totalReparto = form.repartos.reduce((s, r) => s + (parseFloat(r.valor) || 0), 0);
   const lista = [...data.proyectos].sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio));
+
+  const setReparto = (i: number, campo: 'contactoNombre' | 'valor' | 'descripcion', v: string) => {
+    const repartos = [...form.repartos];
+    repartos[i] = { ...repartos[i], [campo]: v };
+    setForm({ ...form, repartos });
+  };
 
   return (
     <div>
       <PageTitle
         title="Proyectos"
-        subtitle="Cada proyecto define su reparto con colaboradores y proveedores"
+        subtitle="Cada proyecto define su comercial, gastos generales y reparto del equipo"
         actions={<Btn onClick={() => abrir()}>+ Nuevo proyecto</Btn>}
       />
 
@@ -120,20 +148,21 @@ const Proyectos: React.FC = () => {
         {lista.length === 0 ? (
           <Empty>No hay proyectos. Créalos aquí o conviértelos desde una oferta aceptada.</Empty>
         ) : (
-          <Table headers={['Código', 'Proyecto', 'Cliente', 'Línea', 'Presupuesto', 'Facturado', 'Cobrado', 'Reparto', 'Estado', '']}>
+          <Table headers={['Código', 'Proyecto', 'Cliente', 'Línea', 'Facturado', 'Cobrado', 'Reparto', 'Estado', '']}>
             {lista.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium whitespace-nowrap">{p.codigo}</td>
                 <td className="px-3 py-2">{p.nombre}</td>
                 <td className="px-3 py-2">{nombreContacto(p.clienteId)}</td>
                 <td className="px-3 py-2 text-gray-500 text-xs">{p.lineaServicio}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{fmtEur(p.presupuesto)}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{fmtEur(baseFacturadaProyecto(data, p.id))}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{fmtEur(baseCobradaProyecto(data, p.id))}</td>
                 <td className="px-3 py-2 text-xs text-gray-500">
                   {p.repartos.length === 0
                     ? '—'
-                    : p.repartos.map((r) => `${nombreContacto(r.contactoId)} ${r.porcentaje}%`).join(', ')}
+                    : p.repartos
+                        .map((r) => `${nombreContacto(r.contactoId)} ${repartoValor(r)}${p.modoReparto === 'horas' ? 'h' : '%'}`)
+                        .join(', ')}
                 </td>
                 <td className="px-3 py-2">
                   <Badge color={badgeEstado[p.estado]}>{p.estado}</Badge>
@@ -198,61 +227,91 @@ const Proyectos: React.FC = () => {
               </select>
             </Field>
 
+            {/* Reglas de liquidación */}
             <div className="border-t border-gray-200 pt-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-gray-700">
-                  Reparto con colaboradores / proveedores
-                </span>
-                <Btn
-                  variant="secondary"
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      repartos: [...form.repartos, { contactoNombre: '', porcentaje: '', descripcion: '' }],
-                    })
-                  }
-                >
-                  + Añadir
-                </Btn>
+              <span className="text-sm font-semibold text-gray-700">Reglas de liquidación</span>
+              <p className="text-xs text-gray-500 mb-2">
+                De cada factura cobrada se descuentan primero los gastos imputados, luego la comisión comercial
+                y los gastos generales. El resto se reparte entre el equipo.
+              </p>
+              <div className="grid md:grid-cols-3 gap-3">
+                <Field label="Comercial (recibe la comisión)">
+                  <input
+                    className={inputCls}
+                    list="comercial-proy"
+                    value={form.comercialNombre}
+                    onChange={(e) => setForm({ ...form, comercialNombre: e.target.value })}
+                    placeholder="Opcional"
+                  />
+                  <datalist id="comercial-proy">
+                    {data.contactos.filter((c) => c.tipo !== 'cliente').map((c) => (
+                      <option key={c.id} value={c.nombre} />
+                    ))}
+                  </datalist>
+                </Field>
+                <Field label="% comisión comercial">
+                  <input type="number" step="0.5" className={inputCls} value={form.comercialPct} onChange={(e) => setForm({ ...form, comercialPct: e.target.value })} />
+                </Field>
+                <Field label="% gastos generales empresa">
+                  <input type="number" step="0.5" className={inputCls} value={form.gastosGeneralesPct} onChange={(e) => setForm({ ...form, gastosGeneralesPct: e.target.value })} />
+                </Field>
+              </div>
+            </div>
+
+            {/* Reparto del equipo */}
+            <div className="border-t border-gray-200 pt-3">
+              <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-gray-700">Reparto del equipo (hasta 6)</span>
+                <div className="flex items-center gap-2">
+                  <select
+                    className={`${inputCls} w-auto`}
+                    value={form.modoReparto}
+                    onChange={(e) => setForm({ ...form, modoReparto: e.target.value as ModoReparto })}
+                  >
+                    <option value="porcentaje">Repartir por %</option>
+                    <option value="horas">Repartir por horas</option>
+                  </select>
+                  <Btn
+                    variant="secondary"
+                    disabled={form.repartos.length >= 6}
+                    onClick={() =>
+                      setForm({ ...form, repartos: [...form.repartos, { contactoNombre: '', valor: '', descripcion: '' }] })
+                    }
+                  >
+                    + Añadir
+                  </Btn>
+                </div>
               </div>
               <p className="text-xs text-gray-500 mb-2">
-                Porcentaje sobre la base imponible cobrada del proyecto. La app calcula automáticamente lo
-                pendiente de liquidar a cada uno.
+                {form.modoReparto === 'horas'
+                  ? 'Cada colaborador recibe una parte de la base de reparto proporcional a sus horas.'
+                  : 'Cada colaborador recibe ese % de la base de reparto (lo que queda tras gastos, comisión y generales).'}
               </p>
               {form.repartos.map((r, i) => (
                 <div key={i} className="flex gap-2 mb-2 items-center">
                   <input
                     className={`${inputCls} flex-1`}
-                    placeholder="Colaborador o proveedor"
+                    placeholder="Colaborador"
                     list="colaboradores-proy"
                     value={r.contactoNombre}
-                    onChange={(e) => {
-                      const repartos = [...form.repartos];
-                      repartos[i] = { ...r, contactoNombre: e.target.value };
-                      setForm({ ...form, repartos });
-                    }}
+                    onChange={(e) => setReparto(i, 'contactoNombre', e.target.value)}
                   />
-                  <input
-                    type="number"
-                    step="0.1"
-                    className={`${inputCls} w-24`}
-                    placeholder="%"
-                    value={r.porcentaje}
-                    onChange={(e) => {
-                      const repartos = [...form.repartos];
-                      repartos[i] = { ...r, porcentaje: e.target.value };
-                      setForm({ ...form, repartos });
-                    }}
-                  />
+                  <div className="relative w-28">
+                    <input
+                      type="number"
+                      step="0.1"
+                      className={inputCls}
+                      placeholder={unidad}
+                      value={r.valor}
+                      onChange={(e) => setReparto(i, 'valor', e.target.value)}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 w-4">{unidad}</span>
                   <input
                     className={`${inputCls} flex-1`}
                     placeholder="Concepto (opcional)"
                     value={r.descripcion}
-                    onChange={(e) => {
-                      const repartos = [...form.repartos];
-                      repartos[i] = { ...r, descripcion: e.target.value };
-                      setForm({ ...form, repartos });
-                    }}
+                    onChange={(e) => setReparto(i, 'descripcion', e.target.value)}
                   />
                   <button
                     className="text-red-500 hover:text-red-700 px-1"
@@ -263,15 +322,15 @@ const Proyectos: React.FC = () => {
                 </div>
               ))}
               <datalist id="colaboradores-proy">
-                {data.contactos
-                  .filter((c) => c.tipo !== 'cliente')
-                  .map((c) => (
-                    <option key={c.id} value={c.nombre} />
-                  ))}
+                {data.contactos.filter((c) => c.tipo !== 'cliente').map((c) => (
+                  <option key={c.id} value={c.nombre} />
+                ))}
               </datalist>
               {form.repartos.length > 0 && (
-                <div className={`text-xs ${totalPct > 100 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                  Total reparto: {totalPct.toFixed(1)}% {totalPct > 100 && '· ¡Supera el 100%!'}
+                <div className={`text-xs ${form.modoReparto === 'porcentaje' && totalReparto > 100 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                  Total: {totalReparto.toFixed(1)} {unidad}
+                  {form.modoReparto === 'porcentaje' && totalReparto > 100 && ' · ¡Supera el 100% de la base de reparto!'}
+                  {form.modoReparto === 'porcentaje' && totalReparto < 100 && totalReparto > 0 && ` · ${(100 - totalReparto).toFixed(1)}% se queda en la empresa`}
                 </div>
               )}
             </div>

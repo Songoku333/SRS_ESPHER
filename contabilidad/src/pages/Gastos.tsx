@@ -12,6 +12,7 @@ interface FormGasto {
   base: string;
   ivaPct: string;
   proyectoId: string;
+  facturaId: string;
   estado: EstadoGasto;
   fechaPago: string;
 }
@@ -29,10 +30,11 @@ const Gastos: React.FC = () => {
       fecha: hoy(),
       proveedorNombre: '',
       concepto: '',
-      categoria: 'Proveedores / Subcontratación',
+      categoria: 'Subcontratación / Ingeniería externa',
       base: '',
       ivaPct: '21',
       proyectoId: '',
+      facturaId: '',
       estado: 'pagado',
       fechaPago: hoy(),
     };
@@ -52,6 +54,7 @@ const Gastos: React.FC = () => {
         base: String(g.base),
         ivaPct: String(g.ivaPct),
         proyectoId: g.proyectoId || '',
+        facturaId: g.facturaId || '',
         estado: g.estado,
         fechaPago: g.fechaPago || '',
       });
@@ -76,6 +79,7 @@ const Gastos: React.FC = () => {
       ivaPct,
       total: Math.round((base + (base * ivaPct) / 100) * 100) / 100,
       proyectoId: form.proyectoId || undefined,
+      facturaId: form.facturaId || undefined,
       estado: form.estado,
       fechaPago: form.estado === 'pagado' ? form.fechaPago || hoy() : undefined,
     };
@@ -204,16 +208,39 @@ const Gastos: React.FC = () => {
                 <input type="number" step="0.5" className={inputCls} value={form.ivaPct} onChange={(e) => setForm({ ...form, ivaPct: e.target.value })} />
               </Field>
             </div>
-            <Field label="Proyecto (opcional, para imputar costes)">
-              <select className={inputCls} value={form.proyectoId} onChange={(e) => setForm({ ...form, proyectoId: e.target.value })}>
-                <option value="">— Sin proyecto —</option>
-                {data.proyectos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo} · {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Proyecto (para imputar costes)">
+                <select
+                  className={inputCls}
+                  value={form.proyectoId}
+                  onChange={(e) => setForm({ ...form, proyectoId: e.target.value, facturaId: '' })}
+                >
+                  <option value="">— Sin proyecto —</option>
+                  {data.proyectos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.codigo} · {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Factura (para descontarlo antes del reparto)">
+                <select
+                  className={inputCls}
+                  value={form.facturaId}
+                  onChange={(e) => setForm({ ...form, facturaId: e.target.value })}
+                  disabled={!form.proyectoId}
+                >
+                  <option value="">— Sin factura concreta —</option>
+                  {data.facturas
+                    .filter((f) => f.proyectoId === form.proyectoId && f.estado !== 'anulada')
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.numero} · {fmtEur(f.base)}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Estado">
                 <select className={inputCls} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoGasto })}>

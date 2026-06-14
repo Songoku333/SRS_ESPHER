@@ -12,8 +12,9 @@ liquidación del reparto con proveedores y colaboradores.
   y sostenibilidad) y gráfico mensual de ingresos vs gastos.
 - **Ofertas**: pipeline comercial (borrador → enviada → aceptada/rechazada) con
   conversión a proyecto en un clic.
-- **Proyectos**: cada proyecto define su **reparto** (% sobre la base imponible
-  cobrada) con colaboradores y proveedores.
+- **Proyectos**: cada proyecto define sus reglas de liquidación (comercial y su %
+  de comisión, % de gastos generales de empresa) y el **reparto del equipo**
+  (hasta 6 colaboradores, por % o por horas).
 - **Facturas**: importadas desde tu Excel de facturación o creadas a mano, con
   IVA/IRPF y total calculado. Se marcan cobradas a mano o al conciliar el banco.
 - **Gastos**: facturas recibidas y gastos por categoría, imputables a proyecto.
@@ -23,9 +24,12 @@ liquidación del reparto con proveedores y colaboradores.
   importe y cercanía de fecha, y los marca cobrados/pagados. También conciliación
   guiada uno a uno, y convertir un movimiento de tarjeta o transferencia emitida
   en un gasto imputable a proyecto.
-- **Liquidaciones**: calcula lo devengado por cada colaborador/proveedor según lo
-  cobrado de cada proyecto, lo ya liquidado y lo pendiente; filtra por periodo de
-  cobros y registra en lote las liquidaciones pendientes del periodo.
+- **Liquidaciones**: muestra las facturas cobradas aún no liquidadas y, por cada
+  una, la cascada completa: base imponible − gastos propios imputados (OCAs,
+  visados, desplazamientos, subcontratación…) → − % comisión comercial − % gastos
+  generales = base de reparto, repartida entre los colaboradores (por % o por
+  horas, hasta 6). Cada beneficiario tiene su casilla de pagado, y la factura se
+  marca como liquidada cuando todo está pagado y dado por bueno.
 - **Rentabilidad**: beneficio neto por proyecto y global cruzando facturas,
   gastos imputados y liquidaciones. Por cada proyecto/factura muestra facturado,
   cobrado, costes, reparto, beneficio estimado, margen %, beneficio en caja y lo

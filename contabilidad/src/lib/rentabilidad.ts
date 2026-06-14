@@ -1,5 +1,6 @@
 import { AppData, Factura, Gasto, Liquidacion } from '../types';
 import { baseFacturadaProyecto, Rango, enRango } from './calculos';
+import { repartoPagableFactura } from './liquidacion';
 
 export type { Rango };
 export { enRango };
@@ -37,12 +38,6 @@ export interface RentabilidadProyecto {
   beneficioCaja: number; // cobrado - gastosPagados - liqPagada (caja real)
 }
 
-function pctReparto(data: AppData, proyectoId: string): number {
-  const p = data.proyectos.find((x) => x.id === proyectoId);
-  if (!p) return 0;
-  return p.repartos.reduce((s, r) => s + r.porcentaje, 0);
-}
-
 export function rentabilidadProyectos(data: AppData, rango?: Rango): RentabilidadProyecto[] {
   const out: RentabilidadProyecto[] = [];
   const cliente = (id: string) => data.contactos.find((c) => c.id === id)?.nombre || '—';
@@ -75,9 +70,11 @@ export function rentabilidadProyectos(data: AppData, rango?: Rango): Rentabilida
       .filter((g) => g.estado === 'pendiente')
       .reduce((s, g) => s + g.total, 0);
 
-    const pct = proyectoId ? pctReparto(data, proyectoId) : 0;
-    const liqEstimada = (facturado * pct) / 100;
-    const liqDevengada = (cobrado * pct) / 100;
+    // Coste de reparto = comisión comercial + colaboradores, según la cascada de cada factura
+    const liqEstimada = facturas.reduce((s, f) => s + repartoPagableFactura(data, f), 0);
+    const liqDevengada = facturas
+      .filter((f) => f.estado === 'cobrada')
+      .reduce((s, f) => s + repartoPagableFactura(data, f), 0);
     const liqPagada = liquidaciones
       .filter((l) => l.estado === 'pagada')
       .reduce((s, l) => s + l.importe, 0);
