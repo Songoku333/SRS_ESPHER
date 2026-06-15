@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Page } from './types';
 import { initSync, useSyncInfo, SyncStatus } from './lib/sync';
+import { useAcceso } from './lib/acceso';
+import { ROLES } from './types';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Ofertas from './pages/Ofertas';
@@ -12,6 +14,7 @@ import Liquidaciones from './pages/Liquidaciones';
 import Rentabilidad from './pages/Rentabilidad';
 import Contactos from './pages/Contactos';
 import Importar from './pages/Importar';
+import Usuarios from './pages/Usuarios';
 import Ajustes from './pages/Ajustes';
 
 const NAV: { page: Page; label: string; icon: string }[] = [
@@ -25,6 +28,7 @@ const NAV: { page: Page; label: string; icon: string }[] = [
   { page: 'rentabilidad', label: 'Rentabilidad', icon: '📈' },
   { page: 'contactos', label: 'Contactos', icon: '👥' },
   { page: 'importar', label: 'Importar Excel', icon: '⬆️' },
+  { page: 'usuarios', label: 'Usuarios', icon: '🔑' },
   { page: 'ajustes', label: 'Ajustes', icon: '⚙️' },
 ];
 
@@ -41,10 +45,20 @@ const App: React.FC = () => {
   const [page, setPage] = useState<Page>('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
   const sync = useSyncInfo();
+  const acceso = useAcceso();
 
   useEffect(() => {
     initSync();
   }, []);
+
+  const navVisible = NAV.filter((item) => acceso.secciones.includes(item.page));
+
+  // Si la sección actual no es visible para el usuario, ir a la primera permitida
+  useEffect(() => {
+    if (acceso.cargado && !acceso.secciones.includes(page) && acceso.secciones.length > 0) {
+      setPage(acceso.secciones[0]);
+    }
+  }, [acceso, page]);
 
   const render = () => {
     switch (page) {
@@ -68,10 +82,17 @@ const App: React.FC = () => {
         return <Contactos />;
       case 'importar':
         return <Importar />;
+      case 'usuarios':
+        return <Usuarios />;
       case 'ajustes':
         return <Ajustes />;
     }
   };
+
+  // Bloqueo de seguridad: no renderizar una sección no permitida
+  if (acceso.cargado && !acceso.secciones.includes(page) && acceso.secciones.length > 0) {
+    return null;
+  }
 
   if (sync.status === 'sin_sesion') {
     return <Login />;
@@ -90,7 +111,7 @@ const App: React.FC = () => {
           <div className="text-xs text-slate-400 mt-0.5">Contabilidad de ingeniería</div>
         </div>
         <nav className="flex-1 py-3 overflow-y-auto">
-          {NAV.map((item) => (
+          {navVisible.map((item) => (
             <button
               key={item.page}
               onClick={() => {
@@ -112,7 +133,14 @@ const App: React.FC = () => {
           <span className={SYNC_LABEL[sync.status].color} title={sync.error || ''}>
             {SYNC_LABEL[sync.status].texto}
           </span>
-          {sync.email && <div className="text-slate-500 mt-0.5">{sync.email}</div>}
+          {sync.email && (
+            <div className="text-slate-500 mt-0.5">
+              {sync.email}
+              {acceso.cargado && acceso.multiusuarioActivo && (
+                <span className="text-slate-400"> · {ROLES.find((r) => r.valor === acceso.rol)?.etiqueta}</span>
+              )}
+            </div>
+          )}
           {sync.status === 'local' && (
             <div className="text-slate-500 mt-0.5">Activa la nube desde Ajustes.</div>
           )}

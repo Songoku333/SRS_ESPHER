@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppData, setState, uid, ensureContacto } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { Proyecto, EstadoProyecto, LineaServicio, LINEAS_SERVICIO, Reparto, ModoReparto } from '../types';
 import { fmtEur, hoy } from '../lib/format';
 import { baseFacturadaProyecto, baseCobradaProyecto } from '../lib/calculos';
@@ -23,7 +24,7 @@ interface FormProyecto {
 }
 
 const Proyectos: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState<Proyecto | null>(null);
   const [form, setForm] = useState<FormProyecto>(formVacio());

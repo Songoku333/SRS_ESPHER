@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppData, setState, uid } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { Liquidacion } from '../types';
 import { facturasPorLiquidar, desgloseFactura, DesgloseFactura, LineaLiquidacion, totalPendienteLiquidar } from '../lib/liquidacion';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
@@ -23,7 +24,7 @@ const Fila: React.FC<{ etiqueta: string; valor: string; signo?: '+' | '−'; fue
 );
 
 const TarjetaFactura: React.FC<{ d: DesgloseFactura }> = ({ d }) => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const cliente = data.contactos.find((c) => c.id === d.factura.clienteId)?.nombre || '—';
 
   const togglePagada = (linea: LineaLiquidacion) => {
@@ -186,7 +187,7 @@ const TarjetaFactura: React.FC<{ d: DesgloseFactura }> = ({ d }) => {
 };
 
 const Liquidaciones: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [verLiquidadas, setVerLiquidadas] = useState(false);
 
   const porLiquidar = useMemo(() => facturasPorLiquidar(data), [data]);

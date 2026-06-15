@@ -43,6 +43,12 @@ liquidación del reparto con proveedores y colaboradores.
   (xlsx, xls, csv). Detecta las columnas automáticamente (puedes corregir el
   mapeo), acepta importes en formato español (1.234,56 €), fechas dd/mm/aaaa o
   de Excel, y omite duplicados (puedes re-importar el mismo fichero sin miedo).
+- **Usuarios y accesos** (solo Dirección): equipo con tres niveles de acceso —
+  Dirección general (todo), Gestión (solo clientes/proyectos asignados, sin
+  resultados globales ni banco) y Colaborador (solo sus proyectos y sus
+  liquidaciones). Permisos por sección editables por persona. La seguridad se
+  aplica en el servidor (reglas RLS de Supabase, ver `supabase/schema-multiusuario.sql`),
+  no solo en la interfaz.
 - **Ajustes**: copia de seguridad completa (descarga/restauración en JSON).
 
 ## Dónde se guardan los datos

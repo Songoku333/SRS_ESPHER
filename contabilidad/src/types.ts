@@ -204,4 +204,25 @@ export type Page =
   | 'rentabilidad'
   | 'contactos'
   | 'importar'
+  | 'usuarios'
   | 'ajustes';
+
+export type Rol = 'direccion' | 'gestion' | 'colaborador';
+
+export const ROLES: { valor: Rol; etiqueta: string; descripcion: string }[] = [
+  { valor: 'direccion', etiqueta: 'Dirección general', descripcion: 'Acceso total, incluida la administración de usuarios y los resultados globales.' },
+  { valor: 'gestion', etiqueta: 'Gestión', descripcion: 'Parte operativa de los clientes y proyectos asignados. Sin resultados globales ni administración.' },
+  { valor: 'colaborador', etiqueta: 'Colaborador', descripcion: 'Solo los proyectos en los que participa y sus propias liquidaciones.' },
+];
+
+/** Miembro del equipo con acceso a la plataforma. Vive en una tabla protegida de Supabase. */
+export interface Miembro {
+  email: string; // identifica al usuario (debe coincidir con su usuario de Supabase)
+  nombre: string;
+  rol: Rol;
+  contactoId?: string; // vincula al contacto (para actuar como colaborador/comercial)
+  activo: boolean;
+  clientesAsignados: string[]; // ids de contactos cliente (alcance de Gestión)
+  proyectosAsignados: string[]; // ids de proyectos (alcance de Gestión)
+  secciones?: Page[]; // si se define, lista explícita de secciones visibles (anula el valor por rol)
+}
