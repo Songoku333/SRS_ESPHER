@@ -102,7 +102,16 @@ export async function cargarAcceso(email: string) {
     }
     const miembros = (data || []).map(filaAMiembro);
     if (miembros.length === 0) {
-      // Tabla vacía: el primer usuario es Dirección (bootstrap).
+      // Tabla vacía: registramos a este usuario como Dirección (evita autobloqueos)
+      // y queda como propietario. Si falla, seguimos como Dirección por bootstrap.
+      try {
+        await client.from('miembros').upsert(
+          miembroAFila({ email: correo, nombre: '', rol: 'direccion', activo: true, clientesAsignados: [], proyectosAsignados: [] }),
+          { onConflict: 'email' }
+        );
+      } catch {
+        /* el bootstrap del servidor ya da acceso de Dirección */
+      }
       setAcceso({ ...ACCESO_INICIAL, cargado: true, email: correo, multiusuarioActivo: true });
       return;
     }

@@ -80,15 +80,19 @@ create policy "miembros_admin" on public.miembros for all
 -- 4) Datos compartidos: clave primaria por id (eran privados por usuario) -----
 -- (Solo hay datos de un usuario, así que el id ya es único.)
 do $$
-declare t text;
+declare t text; pk text;
 begin
   foreach t in array array['contactos','ofertas','proyectos','facturas','gastos','movimientos','liquidaciones']
   loop
+    -- 4.1) Eliminar la clave primaria compuesta actual (sea cual sea su nombre)
+    select conname into pk from pg_constraint
+      where conrelid = ('public.' || t)::regclass and contype = 'p';
+    if pk is not null then
+      execute format('alter table public.%I drop constraint %I', t, pk);
+    end if;
+    -- 4.2) Ahora ya se puede quitar el NOT NULL de user_id
     execute format('alter table public.%I alter column user_id drop not null', t);
-    begin
-      execute format('alter table public.%I drop constraint %I', t, t || '_pkey');
-    exception when others then null;
-    end;
+    -- 4.3) Nueva clave primaria por id (ignora si ya existe)
     begin
       execute format('alter table public.%I add primary key (id)', t);
     exception when others then null;
@@ -151,7 +155,10 @@ create policy "acceso" on public.liquidaciones for all
   with check (public.es_direccion()
       or (public.mi_rol() = 'gestion' and public.proyecto_visible(data->>'proyectoId')));
 
--- 6) Date de alta como Dirección (EDITA el email por el tuyo) -----------------
+-- 6) Tu alta como Dirección.
+-- No hace falta hacer nada manual: al entrar en la app por primera vez con el
+-- multiusuario activo, tu usuario queda registrado automáticamente como Dirección.
+-- (Opcional) Si prefieres dejarlo hecho desde aquí, descomenta y pon tu email:
 -- insert into public.miembros (email, nombre, rol, activo)
 -- values ('fgonzalo@smartremsolutions.com', 'Félix Gonzalo Alonso', 'direccion', true)
 -- on conflict (email) do update set rol = 'direccion', activo = true;
