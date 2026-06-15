@@ -3,6 +3,7 @@ import { Session } from '@supabase/supabase-js';
 import { AppData, EMPTY_DATA } from '../types';
 import { getClient, getConfig } from './supabase';
 import { getState, replaceStateQuiet, registerChangeHook } from './store';
+import { cargarAcceso, limpiarAcceso } from './acceso';
 
 export type SyncStatus =
   | 'local' // sin nube configurada: solo este navegador
@@ -75,6 +76,7 @@ export function initSync() {
       void conectar();
     } else if (!nuevaSesion) {
       registerChangeHook(null);
+      limpiarAcceso();
       setInfo({ status: 'sin_sesion' });
     }
   });
@@ -121,6 +123,7 @@ async function conectar() {
       replaceStateQuiet(nube);
     }
     registerChangeHook(onChange);
+    await cargarAcceso(session?.user.email || '');
     setInfo({ status: 'sincronizado', email: session?.user.email });
   } catch (e: any) {
     setInfo({ status: 'error', email: session?.user.email, error: mensajeError(e) });
@@ -209,7 +212,9 @@ async function flush() {
       }
       if (p.deletes.size > 0) {
         const ids = [...p.deletes];
-        const { error } = await client.from(c).delete().eq('user_id', userId).in('id', ids);
+        // Sin filtro por user_id: en modo single-user la RLS ya restringe a las filas
+        // propias; en modo compartido (multiusuario) la RLS gobierna por rol.
+        const { error } = await client.from(c).delete().in('id', ids);
         if (error) throw error;
         p.deletes.clear();
       }

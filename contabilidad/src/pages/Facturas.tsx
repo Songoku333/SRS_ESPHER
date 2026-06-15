@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppData, setState, uid, ensureContacto } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { Factura, EstadoFactura } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
@@ -24,7 +25,7 @@ function calcTotal(base: number, ivaPct: number, irpfPct: number): number {
 }
 
 const Facturas: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [filtro, setFiltro] = useState<EstadoFactura | 'todas'>('todas');
   const [busca, setBusca] = useState('');
   const [abierto, setAbierto] = useState(false);

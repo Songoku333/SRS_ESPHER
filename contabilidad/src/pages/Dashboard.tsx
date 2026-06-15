@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppData } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { calcularKPIs } from '../lib/calculos';
 import { fmtEur, fmtMes, mesDe } from '../lib/format';
 import { Card, PageTitle, Empty, inputCls } from '../components/ui';
@@ -52,7 +53,7 @@ const BarChart: React.FC<{ datos: { etiqueta: string; ingresos: number; gastos: 
 };
 
 const Dashboard: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [anyo, setAnyo] = useState(new Date().getFullYear());
   const kpis = useMemo(() => calcularKPIs(data, anyo), [data, anyo]);
 

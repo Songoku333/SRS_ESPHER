@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppData, setState, uid } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { Contacto, TipoContacto } from '../types';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, Empty } from '../components/ui';
 
@@ -12,7 +13,7 @@ const TIPOS: { valor: TipoContacto; etiqueta: string; color: string }[] = [
 const VACIO: Omit<Contacto, 'id'> = { tipo: 'cliente', nombre: '', nif: '', email: '', telefono: '', notas: '' };
 
 const Contactos: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [filtro, setFiltro] = useState<TipoContacto | 'todos'>('todos');
   const [busca, setBusca] = useState('');
   const [editando, setEditando] = useState<Contacto | null>(null);

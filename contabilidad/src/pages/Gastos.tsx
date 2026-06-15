@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppData, setState, uid, ensureContacto } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { Gasto, EstadoGasto, CategoriaGasto, CATEGORIAS_GASTO } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
@@ -18,7 +19,7 @@ interface FormGasto {
 }
 
 const Gastos: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [filtro, setFiltro] = useState<EstadoGasto | 'todos'>('todos');
   const [busca, setBusca] = useState('');
   const [abierto, setAbierto] = useState(false);

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppData } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { rentabilidadProyectos, totalesRentabilidad, Rango, RentabilidadProyecto } from '../lib/rentabilidad';
 import { fmtEur, fmtDate } from '../lib/format';
 import { Card, PageTitle, Table, Badge, badgeEstado, Empty, inputCls, Btn } from '../components/ui';
@@ -24,7 +25,7 @@ const KpiCard: React.FC<{ label: string; value: string; sub?: string; tone?: 'po
 );
 
 const Detalle: React.FC<{ r: RentabilidadProyecto }> = ({ r }) => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const nombre = (id?: string) => (id ? data.contactos.find((c) => c.id === id)?.nombre || '—' : '—');
   return (
     <tr className="bg-gray-50/60">
@@ -94,7 +95,7 @@ const Detalle: React.FC<{ r: RentabilidadProyecto }> = ({ r }) => {
 };
 
 const Rentabilidad: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const anyo = new Date().getFullYear();
   const [rango, setRango] = useState<Rango>({ desde: `${anyo}-01-01`, hasta: `${anyo}-12-31` });
   const [expandido, setExpandido] = useState<string | null>(null);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppData, setState, uid, ensureContacto } from '../lib/store';
+import { useDatosVisibles } from '../lib/vista';
 import { Oferta, EstadoOferta, LineaServicio, LINEAS_SERVICIO } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
@@ -18,7 +19,7 @@ interface FormOferta {
 }
 
 const Ofertas: React.FC = () => {
-  const data = useAppData();
+  const data = useDatosVisibles();
   const [filtroEstado, setFiltroEstado] = useState<EstadoOferta | 'todas'>('todas');
   const [editando, setEditando] = useState<Oferta | null>(null);
   const [abierto, setAbierto] = useState(false);
