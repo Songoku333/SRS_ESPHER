@@ -77,6 +77,8 @@ const TarjetaFactura: React.FC<{ d: DesgloseFactura }> = ({ d }) => {
         <div className="flex items-center gap-2">
           {d.liquidada ? (
             <Badge color="bg-green-100 text-green-700">liquidada</Badge>
+          ) : d.lineas.length === 0 ? (
+            <Badge color="bg-amber-100 text-amber-700">sin reparto configurado</Badge>
           ) : d.pendiente <= 0.005 ? (
             <Badge color="bg-teal-100 text-teal-700">todo pagado</Badge>
           ) : (

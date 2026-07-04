@@ -2,8 +2,9 @@ import { useSyncExternalStore } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { AppData, EMPTY_DATA } from '../types';
 import { getClient, getConfig } from './supabase';
-import { getState, replaceStateQuiet, registerChangeHook } from './store';
+import { getState, setState, replaceStateQuiet, registerChangeHook } from './store';
 import { cargarAcceso, limpiarAcceso } from './acceso';
+import { repararDatos } from './reparar';
 
 export type SyncStatus =
   | 'local' // sin nube configurada: solo este navegador
@@ -124,6 +125,9 @@ async function conectar() {
     }
     registerChangeHook(onChange);
     await cargarAcceso(session?.user.email || '');
+    // Reparación de datos importados con IVA en euros: sube solo las filas corregidas
+    const rep = repararDatos(getState());
+    if (rep.cambios > 0) setState(() => rep.data);
     setInfo({ status: 'sincronizado', email: session?.user.email });
   } catch (e: any) {
     setInfo({ status: 'error', email: session?.user.email, error: mensajeError(e) });
