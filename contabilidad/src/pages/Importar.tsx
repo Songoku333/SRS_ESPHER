@@ -130,8 +130,8 @@ const Importar: React.FC = () => {
           continue;
         }
         existentes.add(numero.toLowerCase());
-        const ivaPct = mapeo.ivaPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'ivaPct'))) : 21;
-        const irpfPct = mapeo.irpfPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'irpfPct'))) : 0;
+        const ivaPct = mapeo.ivaPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'ivaPct')), base) : 21;
+        const irpfPct = mapeo.irpfPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'irpfPct')), base) : 0;
         const totalLeido = mapeo.total !== undefined ? parseImporte(celda(fila, 'total')) : 0;
         const total = totalLeido || Math.round((base + (base * ivaPct) / 100 - (base * irpfPct) / 100) * 100) / 100;
         const cobrada = mapeo.estado !== undefined && esCobrada(celda(fila, 'estado'));
@@ -185,7 +185,7 @@ const Importar: React.FC = () => {
           omitidos++;
           continue;
         }
-        const ivaPct = mapeo.ivaPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'ivaPct'))) : 21;
+        const ivaPct = mapeo.ivaPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'ivaPct')), base) : 21;
         const proveedor = String(celda(fila, 'proveedor') ?? '').trim();
         nuevos.push({
           id: uid(),
@@ -212,9 +212,12 @@ const Importar: React.FC = () => {
     setHojas([]);
   };
 
-  /** Si el IVA viene como 0,21 lo pasa a 21. */
-  function normalizaPct(v: number): number {
-    return v > 0 && v < 1 ? v * 100 : v;
+  /** Normaliza el IVA/IRPF leído: 0,21 → 21; y si la columna trae el importe en
+   *  euros en vez de un porcentaje (valor imposible como %), lo deriva de la base. */
+  function normalizaPct(v: number, base?: number): number {
+    if (v > 0 && v < 1) return Math.round(v * 10000) / 100;
+    if (v > 30 && base && base > 0) return Math.round((v / base) * 10000) / 100;
+    return v;
   }
 
   const preview = useMemo(() => (hoja ? hoja.filas.slice(0, 5) : []), [hoja]);

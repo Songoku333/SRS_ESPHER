@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { AppData, EMPTY_DATA } from '../types';
+import { repararDatos } from './reparar';
 
 const STORAGE_KEY = 'srs-contabilidad-v1';
 
@@ -8,7 +9,7 @@ function load(): AppData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY_DATA;
     const parsed = JSON.parse(raw);
-    return { ...EMPTY_DATA, ...parsed };
+    return repararDatos({ ...EMPTY_DATA, ...parsed }).data;
   } catch {
     return EMPTY_DATA;
   }
