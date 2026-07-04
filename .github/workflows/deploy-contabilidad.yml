@@ -1,8 +1,10 @@
 name: Publicar SRS Gestión en GitHub Pages
 
+# Solo main: el entorno github-pages rechaza otras ramas y, al compartir el
+# grupo de concurrencia, sus runs cancelaban el despliegue bueno de main.
 on:
   push:
-    branches: [main, claude/engineering-accounting-app-803dw4]
+    branches: [main]
     paths: ['contabilidad/**', '.github/workflows/deploy-contabilidad.yml']
   workflow_dispatch:
 
