@@ -101,3 +101,24 @@ npm run build     # genera dist/ (estático, desplegable en cualquier hosting)
 La app es 100 % estática (React + Vite + Tailwind empaquetado): el contenido de
 `dist/` puede servirse desde GitHub Pages o cualquier hosting, también sin
 conexión a internet.
+
+## Conectar tu IA (servidor MCP)
+
+La app incluye un servidor MCP para consultar la contabilidad desde Claude u
+otro asistente compatible, **respetando los mismos roles** (cada persona solo
+consulta lo que ve en la app). Herramientas: resumen financiero, facturas,
+proyectos, gastos, liquidaciones pendientes con su desglose, búsqueda y
+creación de gastos (solo Dirección/Gestión).
+
+Activación (una vez):
+
+1. Ejecuta [`supabase/mcp.sql`](supabase/mcp.sql) en el SQL Editor.
+2. En Supabase → **Edge Functions** → *Deploy new function*: nombre `mcp`,
+   pega el contenido de [`supabase/functions/mcp/index.ts`](supabase/functions/mcp/index.ts)
+   y despliega. Importante: **desactiva "Verify JWT"** en la configuración de
+   la función (la autenticación la hacen las claves personales).
+3. En la app → **Ajustes → Conectar tu IA (MCP)** → *Generar clave*. Se muestra
+   una sola vez, junto con la URL del servidor y la configuración lista para
+   Claude Desktop (vía `mcp-remote` con cabecera `Authorization: Bearer …`).
+
+Cada usuario genera su propia clave y puede revocarla cuando quiera.
