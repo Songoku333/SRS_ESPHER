@@ -9,7 +9,9 @@ export interface HojaExcel {
 /** Lee un fichero Excel o CSV y devuelve todas sus hojas con cabeceras y filas. */
 export async function leerExcel(file: File): Promise<HojaExcel[]> {
   const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+  // raw:true solo afecta a CSV/texto: evita que fechas como 06/07/2026 se
+  // interpreten al estilo americano (mes/día); nuestro parseFecha ya entiende dd/mm.
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: false, raw: true });
   return wb.SheetNames.map((nombre) => {
     const ws = wb.Sheets[nombre];
     const matriz: unknown[][] = XLSX.utils.sheet_to_json(ws, {

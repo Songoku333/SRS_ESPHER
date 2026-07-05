@@ -179,6 +179,28 @@ function desglose(data: any, f: any) {
   };
 }
 
+/** Busca un contacto visible por nombre; si no existe lo crea (los clientes solo puede crearlos Dirección). */
+async function buscarOCrearContacto(
+  deps: Deps,
+  data: any,
+  acc: Acceso,
+  nombre: string,
+  tipo: 'cliente' | 'proveedor' | 'colaborador'
+): Promise<string> {
+  const limpio = nombre.trim();
+  const existente = data.contactos.find(
+    (c: any) => (c.nombre || '').trim().toLowerCase() === limpio.toLowerCase()
+  );
+  if (existente) return existente.id;
+  if (tipo === 'cliente' && acc.rol !== 'direccion') {
+    throw new Error(`Cliente "${limpio}" no encontrado o fuera de tu alcance. Pide a Dirección que te lo asigne.`);
+  }
+  const contacto = { id: uid(), tipo, nombre: limpio };
+  await pgInsert(deps, 'contactos', { id: contacto.id, data: contacto, updated_at: new Date().toISOString() });
+  data.contactos.push(contacto);
+  return contacto.id;
+}
+
 // ---------- herramientas ----------
 const HERRAMIENTAS = [
   {
@@ -227,7 +249,7 @@ const HERRAMIENTAS = [
   },
   {
     name: 'crear_gasto',
-    description: 'Registra un gasto (solo Dirección y Gestión). Puede imputarse a un proyecto por su código y a una factura por su número.',
+    description: 'Registra un gasto o factura recibida de proveedor (solo Dirección y Gestión). Puede imputarse a un proyecto por su código y a una factura emitida por su número (para descontarlo antes del reparto). Úsalo al extraer datos de un PDF de factura de proveedor.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -235,11 +257,37 @@ const HERRAMIENTAS = [
         base: { type: 'number', description: 'Base imponible en euros' },
         ivaPct: { type: 'number', description: 'Por defecto 21' },
         fecha: { type: 'string', description: 'yyyy-mm-dd; por defecto hoy' },
+        proveedor: { type: 'string', description: 'Nombre del proveedor o colaborador' },
+        categoria: {
+          type: 'string',
+          enum: ['Subcontratación / Ingeniería externa', 'OCA / Inspecciones', 'Visados y colegios', 'Tasas y licencias administrativas', 'Desplazamientos y dietas', 'Colaboradores', 'Software y licencias', 'Seguros (RC, decenal)', 'Material y equipos', 'Suministros y oficina', 'Impuestos', 'Otros'],
+          description: 'Por defecto Otros',
+        },
         proyectoCodigo: { type: 'string' },
         facturaNumero: { type: 'string' },
         pagado: { type: 'boolean', description: 'Por defecto false (pendiente)' },
       },
       required: ['concepto', 'base'],
+    },
+  },
+  {
+    name: 'crear_factura',
+    description: 'Registra una factura emitida por Smart Rem a un cliente (solo Dirección y Gestión). Rechaza números duplicados. Úsalo al extraer datos de un PDF de factura emitida.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        numero: { type: 'string', description: 'Número de la factura' },
+        cliente: { type: 'string', description: 'Nombre del cliente' },
+        base: { type: 'number', description: 'Base imponible en euros' },
+        fecha: { type: 'string', description: 'yyyy-mm-dd; por defecto hoy' },
+        concepto: { type: 'string' },
+        ivaPct: { type: 'number', description: 'Por defecto 21' },
+        irpfPct: { type: 'number', description: 'Por defecto 0' },
+        cobrada: { type: 'boolean', description: 'true si ya está cobrada' },
+        fechaCobro: { type: 'string', description: 'yyyy-mm-dd si está cobrada' },
+        proyectoCodigo: { type: 'string', description: 'Código del proyecto al que pertenece' },
+      },
+      required: ['numero', 'cliente', 'base'],
     },
   },
 ];
@@ -378,11 +426,15 @@ async function ejecutar(nombre: string, args: any, data: any, acc: Acceso, deps:
       facturaId = f.id;
       proyectoId = proyectoId || f.proyectoId;
     }
+    const contactoId = args.proveedor
+      ? await buscarOCrearContacto(deps, data, acc, String(args.proveedor), 'proveedor')
+      : undefined;
     const gasto = {
       id: uid(),
       fecha: args.fecha || new Date().toISOString().slice(0, 10),
+      contactoId,
       concepto: String(args.concepto).trim(),
-      categoria: 'Otros',
+      categoria: args.categoria || 'Otros',
       base: r2(base),
       ivaPct,
       total: r2(base * (1 + ivaPct / 100)),
@@ -392,7 +444,48 @@ async function ejecutar(nombre: string, args: any, data: any, acc: Acceso, deps:
       fechaPago: args.pagado ? args.fecha || new Date().toISOString().slice(0, 10) : undefined,
     };
     await pgInsert(deps, 'gastos', { id: gasto.id, data: gasto, updated_at: new Date().toISOString() });
-    return { creado: true, gasto: { concepto: gasto.concepto, base: gasto.base, total: gasto.total, estado: gasto.estado } };
+    return { creado: true, gasto: { concepto: gasto.concepto, proveedor: args.proveedor || null, categoria: gasto.categoria, base: gasto.base, total: gasto.total, estado: gasto.estado } };
+  }
+
+  if (nombre === 'crear_factura') {
+    if (acc.rol === 'colaborador') throw new Error('Tu rol no permite crear facturas.');
+    const numero = String(args.numero || '').trim();
+    const base = Number(args.base);
+    if (!numero || !(base > 0) || !String(args.cliente || '').trim()) {
+      throw new Error('Faltan número, cliente o base.');
+    }
+    // Dedup contra TODAS las facturas de la empresa (no solo las visibles)
+    const dup = await pg(deps, `facturas?select=id&data->>numero=eq.${encodeURIComponent(numero)}`);
+    if (dup.length > 0) throw new Error(`La factura ${numero} ya existe. No se ha creado.`);
+    const clienteId = await buscarOCrearContacto(deps, data, acc, String(args.cliente), 'cliente');
+    let proyectoId: string | undefined;
+    if (args.proyectoCodigo) {
+      const p = data.proyectos.find((x: any) => x.codigo === args.proyectoCodigo);
+      if (!p) throw new Error(`Proyecto ${args.proyectoCodigo} no encontrado o fuera de tu alcance.`);
+      proyectoId = p.id;
+    }
+    const ivaPct = args.ivaPct != null ? Number(args.ivaPct) : 21;
+    const irpfPct = args.irpfPct != null ? Number(args.irpfPct) : 0;
+    const fecha = args.fecha || new Date().toISOString().slice(0, 10);
+    const factura = {
+      id: uid(),
+      numero,
+      fecha,
+      clienteId,
+      proyectoId,
+      concepto: String(args.concepto || '').trim(),
+      base: r2(base),
+      ivaPct,
+      irpfPct,
+      total: r2(base * (1 + ivaPct / 100 - irpfPct / 100)),
+      estado: args.cobrada ? 'cobrada' : 'emitida',
+      fechaCobro: args.cobrada ? args.fechaCobro || fecha : undefined,
+    };
+    await pgInsert(deps, 'facturas', { id: factura.id, data: factura, updated_at: new Date().toISOString() });
+    return {
+      creada: true,
+      factura: { numero: factura.numero, cliente: args.cliente, base: factura.base, total: factura.total, estado: factura.estado },
+    };
   }
 
   throw new Error(`Herramienta desconocida: ${nombre}`);

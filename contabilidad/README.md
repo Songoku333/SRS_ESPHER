@@ -122,3 +122,29 @@ Activación (una vez):
    Claude Desktop (vía `mcp-remote` con cabecera `Authorization: Bearer …`).
 
 Cada usuario genera su propia clave y puede revocarla cuando quiera.
+
+## Ingesta automática desde SharePoint
+
+La función `ingesta` revisa periódicamente tus carpetas de SharePoint e importa
+sola los **Excel/CSV** nuevos o modificados (facturas, extractos bancarios y
+gastos), con la misma detección de columnas y deduplicación que el importador
+manual. Los **PDF** se registran como pendientes para procesarlos con Claude +
+MCP (herramientas `crear_factura` / `crear_gasto`).
+
+Activación:
+
+1. Registra una app en Microsoft Entra ID con permiso de aplicación
+   `Sites.Read.All` (con consentimiento de administrador) y un client secret.
+2. Ejecuta [`supabase/ingesta.sql`](supabase/ingesta.sql) en el SQL Editor.
+3. Despliega la Edge Function `ingesta` con
+   [`supabase/functions/ingesta/index.ts`](supabase/functions/ingesta/index.ts)
+   (desactiva "Verify JWT") y define los secrets: `MS_TENANT_ID`,
+   `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `SP_SITE`
+   (p. ej. `miempresa.sharepoint.com:/sites/Contabilidad`),
+   `SP_CARPETA_FACTURAS`, `SP_CARPETA_BANCO` y opcionalmente `SP_CARPETA_GASTOS`.
+4. Prográmala cada hora: Dashboard → Integrations → Cron → HTTP request a la
+   función con cabecera `Authorization: Bearer <service_role key>`.
+
+El tipo de movimiento bancario se deduce del nombre del fichero (contiene
+"tarjeta", "emitidas" o "recibidas"; si no, cuenta), y cada fichero queda
+anotado en la tabla `ingesta_ficheros` con su resultado.
