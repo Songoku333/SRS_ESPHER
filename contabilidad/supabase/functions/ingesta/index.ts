@@ -150,12 +150,26 @@ function parseFecha(v: unknown): string {
 }
 
 function detectarColumna(cabeceras: string[], claves: string[]): number {
-  const norm = cabeceras.map((c) => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-  for (const clave of claves) {
-    const i = norm.findIndex((c) => c.includes(clave));
-    if (i !== -1) return i;
+  const norm = cabeceras.map((c) => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim());
+  // Prioridad: coincidencia exacta > empieza por > contiene. As\u00ed "Proveedor" o
+  // "Emisor / proveedor" ganan a "N\u00ba factura proveedor".
+  const tests: ((c: string, k: string) => boolean)[] = [
+    (c, k) => c === k,
+    (c, k) => c.startsWith(k),
+    (c, k) => c.includes(k),
+  ];
+  for (const test of tests) {
+    for (const clave of claves) {
+      const i = norm.findIndex((c) => test(c, clave));
+      if (i !== -1) return i;
+    }
   }
   return -1;
+}
+
+// \u00bfEl texto parece un nombre (persona/empresa) y no una referencia tipo "FA-009-603" o "2026/16"?
+function pareceNombre(s: string): boolean {
+  return /[a-z\u00f1]{3,}/i.test(s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
 }
 
 function normalizaPct(v: number, base?: number): number {
@@ -188,13 +202,36 @@ const CAMPOS = {
     importe: ['importe', 'cantidad', 'monto', 'amount'],
   },
   gastos: {
-    fecha: ['fecha', 'date'],
-    proveedor: ['proveedor', 'acreedor', 'emisor', 'nombre'],
+    fecha: ['fecha factura', 'fecha', 'date'],
+    proveedor: ['emisor / proveedor', 'emisor', 'proveedor', 'acreedor', 'nombre'],
     concepto: ['concepto', 'descripcion', 'detalle'],
-    base: ['base', 'imponible', 'neto'],
+    base: ['base imponible', 'base', 'imponible', 'neto', 'importe'],
     ivaPct: ['% iva', 'iva %', 'iva'],
+    total: ['total', 'importe total'],
+    tipoGasto: ['tipo gasto', 'tipo de gasto'],
+    facturaAsociada: ['factura srs asociada', 'factura srs', 'factura asociada'],
+    numeroProveedor: ['n factura proveedor', 'numero factura proveedor', 'factura proveedor'],
+    cif: ['cif/nif', 'cif', 'nif'],
   },
 } as const;
+
+// Mapea el texto de la columna "Tipo gasto" del Excel a nuestras categorías.
+function categoriaPorTexto(texto: string): string | undefined {
+  const n = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (!n) return undefined;
+  if (n.includes('subcontrat')) return 'Subcontratación / Ingeniería externa';
+  if (n.includes('colaborador')) return 'Colaboradores';
+  if (n.includes('oca') || n.includes('inspecc')) return 'OCA / Inspecciones';
+  if (n.includes('visado') || n.includes('colegio')) return 'Visados y colegios';
+  if (n.includes('tasa') || n.includes('licencia')) return 'Tasas y licencias administrativas';
+  if (n.includes('desplaza') || n.includes('dieta') || n.includes('visita') || n.includes('viaje')) return 'Desplazamientos y dietas';
+  if (n.includes('software')) return 'Software y licencias';
+  if (n.includes('seguro')) return 'Seguros (RC, decenal)';
+  if (n.includes('alquiler') || n.includes('equipo') || n.includes('material')) return 'Material y equipos';
+  if (n.includes('suministro') || n.includes('oficina')) return 'Suministros y oficina';
+  if (n.includes('impuesto')) return 'Impuestos';
+  return undefined;
+}
 
 function mapear(hoja: Hoja, campos: Record<string, readonly string[]>): Record<string, number> {
   const m: Record<string, number> = {};
@@ -239,6 +276,7 @@ interface Ctx {
   clavesMovimiento: Set<string>;
   clavesGasto: Set<string>;
   contactos: Map<string, string>; // nombre en minúsculas → id
+  facturasPorNumero: Map<string, string>; // nº factura SRS en minúsculas → id de factura
   nuevos: { facturas: any[]; movimientos: any[]; gastos: any[]; contactos: any[] };
 }
 
@@ -256,8 +294,17 @@ async function cargarCtx(deps: Deps): Promise<Ctx> {
     clavesMovimiento: new Set(movimientos.map((m: any) => claveMov(m.data))),
     clavesGasto: new Set(gastos.map((g: any) => claveGasto(g.data))),
     contactos: new Map(contactos.map((c: any) => [String(c.data.nombre).trim().toLowerCase(), c.data.id])),
+    facturasPorNumero: new Map(facturas.map((f: any) => [normNumFactura(String(f.data.numero)), f.data.id])),
     nuevos: { facturas: [], movimientos: [], gastos: [], contactos: [] },
   };
+}
+
+// Normaliza un nº de factura SRS para casarlo: "2026000005", "2026/000005",
+// espacios… → solo dígitos si es puramente numérico.
+function normNumFactura(s: string): string {
+  const limpio = s.trim().toLowerCase();
+  const soloDigitos = limpio.replace(/[^0-9]/g, '');
+  return soloDigitos.length >= 6 ? soloDigitos : limpio;
 }
 
 function contactoId(ctx: Ctx, nombre: string, tipo: string): string {
@@ -289,14 +336,16 @@ function importarHojas(tipo: Carpeta['tipo'], ruta: string, hojas: Hoja[], ctx: 
         const base = parseImporte(celda(fila, 'base'));
         if (!numero || !fecha || !cliente || !base || ctx.numerosFactura.has(numero.toLowerCase())) { omitidas++; continue; }
         ctx.numerosFactura.add(numero.toLowerCase());
+        const idFactura = uid();
         const ivaPct = m.ivaPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'ivaPct')), base) : 21;
         const irpfPct = m.irpfPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'irpfPct')), base) : 0;
         const totalLeido = m.total !== undefined ? parseImporte(celda(fila, 'total')) : 0;
         const total = totalLeido || r2(base * (1 + ivaPct / 100 - irpfPct / 100));
         const cobrada = m.estado !== undefined && esCobrada(celda(fila, 'estado'));
         const fechaCobro = parseFecha(celda(fila, 'fechaCobro'));
+        ctx.facturasPorNumero.set(normNumFactura(numero), idFactura);
         ctx.nuevos.facturas.push({
-          id: uid(), numero, fecha,
+          id: idFactura, numero, fecha,
           clienteId: contactoId(ctx, cliente, 'cliente'),
           concepto: String(celda(fila, 'concepto') ?? '').trim(),
           base, ivaPct, irpfPct, total,
@@ -332,12 +381,23 @@ function importarHojas(tipo: Carpeta['tipo'], ruta: string, hojas: Hoja[], ctx: 
         if (ctx.clavesGasto.has(clave)) { omitidas++; continue; }
         ctx.clavesGasto.add(clave);
         const ivaPct = m.ivaPct !== undefined ? normalizaPct(parseImporte(celda(fila, 'ivaPct')), base) : 21;
-        const proveedor = String(celda(fila, 'proveedor') ?? '').trim();
+        // Proveedor: solo lo tomamos si parece un nombre (no una referencia de factura)
+        const provRaw = String(celda(fila, 'proveedor') ?? '').trim();
+        const proveedor = pareceNombre(provRaw) ? provRaw : '';
+        // Categoría: primero la columna "Tipo gasto" del Excel; si no, la carpeta
+        const categoria = categoriaPorTexto(String(celda(fila, 'tipoGasto') ?? '')) || categoriaPorRuta(ruta);
+        // Enlace a la factura SRS asociada (para la cascada de liquidación)
+        const numFacturaRaw = String(celda(fila, 'facturaAsociada') ?? '').trim();
+        const facturaId = numFacturaRaw ? ctx.facturasPorNumero.get(normNumFactura(numFacturaRaw)) : undefined;
+        const numeroProveedor = String(celda(fila, 'numeroProveedor') ?? '').trim() || undefined;
+        const cif = String(celda(fila, 'cif') ?? '').trim() || undefined;
+        const totalLeido = m.total !== undefined ? parseImporte(celda(fila, 'total')) : 0;
         ctx.nuevos.gastos.push({
           id: uid(), fecha,
           contactoId: proveedor ? contactoId(ctx, proveedor, 'proveedor') : undefined,
-          concepto, categoria: categoriaPorRuta(ruta), base, ivaPct,
-          total: r2(base * (1 + ivaPct / 100)),
+          concepto, categoria, base, ivaPct,
+          total: totalLeido || r2(base * (1 + ivaPct / 100)),
+          facturaId, numeroProveedor, cif,
           estado: 'pagado', fechaPago: fecha,
         });
         filas++;

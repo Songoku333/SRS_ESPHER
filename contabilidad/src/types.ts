@@ -128,6 +128,8 @@ export interface Gasto {
   facturaId?: string; // gasto imputado a una factura concreta (para la liquidación)
   estado: EstadoGasto;
   fechaPago?: string;
+  numeroProveedor?: string; // nº de la factura del proveedor (informativo)
+  cif?: string; // CIF/NIF del proveedor (informativo)
 }
 
 export type TipoMovimiento =
