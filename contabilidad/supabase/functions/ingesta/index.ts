@@ -9,10 +9,15 @@
 // "ingesta" → pegar este fichero → desactivar "Verify JWT".
 // Secrets necesarios (Edge Functions → Secrets):
 //   MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET
-//   SP_SITE                p. ej. "miempresa.sharepoint.com:/sites/Contabilidad"
-//   SP_CARPETA_FACTURAS    p. ej. "Documentos compartidos/Contabilidad/Facturas"
-//   SP_CARPETA_BANCO       p. ej. "Documentos compartidos/Contabilidad/Banco"
+//   SP_SITE                p. ej. "miempresa.sharepoint.com:/sites/CEO"
+//   SP_BIBLIOTECA          (opcional) nombre de la biblioteca de documentos si
+//                          no es la estándar, p. ej. "EasyREM CORE"
+//   SP_CARPETA_FACTURAS    ruta de carpeta O de un fichero concreto dentro de
+//                          la biblioteca, p. ej. "09_FINANZAS/00_MASTER/base.xlsx"
+//   SP_CARPETA_BANCO       p. ej. "09_FINANZAS/01 Bancos"
 //   SP_CARPETA_GASTOS      (opcional)
+// Cada SP_CARPETA_* admite varias rutas separadas por ";". Las carpetas se
+// recorren con sus subcarpetas (se ignoran las llamadas old/antiguo/backup).
 // Programación: Dashboard → Integrations → Cron → cada hora →
 // HTTP request a esta función con cabecera Authorization: Bearer <service_role>.
 // ============================================================
@@ -35,6 +40,7 @@ interface Deps {
   client: string;
   secret: string;
   site: string;
+  biblioteca?: string;
   carpetas: Carpeta[];
   fetchFn: typeof fetch;
   parseWorkbook: (bytes: Uint8Array) => Promise<Hoja[]>;
@@ -199,12 +205,32 @@ function mapear(hoja: Hoja, campos: Record<string, readonly string[]>): Record<s
   return m;
 }
 
-function tipoMovimientoPorNombre(nombre: string): string {
-  const n = nombre.toLowerCase();
+// Deduce el tipo de movimiento de la ruta (subcarpetas + nombre del fichero).
+// Si la ruta solo dice "transferencias", el signo del importe decide el sentido.
+function tipoMovimiento(ruta: string, importe: number): string {
+  const n = ruta.toLowerCase();
   if (n.includes('tarjeta')) return 'tarjeta';
   if (n.includes('emitida')) return 'transferencia_emitida';
   if (n.includes('recibida')) return 'transferencia_recibida';
+  if (n.includes('transferencia')) return importe < 0 ? 'transferencia_emitida' : 'transferencia_recibida';
   return 'cuenta';
+}
+
+// Sugiere la categoría de gasto según la carpeta donde vive el fichero.
+function categoriaPorRuta(ruta: string): string {
+  const n = ruta.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (n.includes('subcontrat')) return 'Subcontratación / Ingeniería externa';
+  if (n.includes('colaborador')) return 'Colaboradores';
+  if (/\bocas?\b/.test(n) || n.includes('inspecc')) return 'OCA / Inspecciones';
+  if (n.includes('colegio') || n.includes('visado')) return 'Visados y colegios';
+  if (n.includes('visita') || n.includes('desplaza') || n.includes('dieta') || n.includes('viaje')) return 'Desplazamientos y dietas';
+  if (n.includes('software')) return 'Software y licencias';
+  if (n.includes('tasa') || n.includes('licencia')) return 'Tasas y licencias administrativas';
+  if (n.includes('seguro')) return 'Seguros (RC, decenal)';
+  if (n.includes('alquiler') || n.includes('equipo') || n.includes('material')) return 'Material y equipos';
+  if (n.includes('suministro') || n.includes('oficina')) return 'Suministros y oficina';
+  if (n.includes('impuesto')) return 'Impuestos';
+  return 'Otros';
 }
 
 // ---------- contexto de importación (dedup + contactos) ----------
@@ -245,7 +271,10 @@ function contactoId(ctx: Ctx, nombre: string, tipo: string): string {
 }
 
 // ---------- importadores ----------
-function importarHojas(tipo: Carpeta['tipo'], nombreFichero: string, hojas: Hoja[], ctx: Ctx): { filas: number; omitidas: number } {
+// "ruta" es la ruta relativa dentro de la carpeta configurada (subcarpetas
+// incluidas), y sirve para deducir tipo de movimiento y categoría de gasto.
+function importarHojas(tipo: Carpeta['tipo'], ruta: string, hojas: Hoja[], ctx: Ctx): { filas: number; omitidas: number } {
+  const nombreFichero = ruta.split('/').pop() || ruta;
   let filas = 0, omitidas = 0;
   for (const hoja of hojas) {
     const m = mapear(hoja, CAMPOS[tipo]);
@@ -278,7 +307,6 @@ function importarHojas(tipo: Carpeta['tipo'], nombreFichero: string, hojas: Hoja
       }
     } else if (tipo === 'banco') {
       if (m.fecha === undefined || m.concepto === undefined || m.importe === undefined) continue;
-      const tipoMov = tipoMovimientoPorNombre(nombreFichero);
       for (const fila of hoja.filas) {
         const fecha = parseFecha(celda(fila, 'fecha'));
         const concepto = String(celda(fila, 'concepto') ?? '').trim();
@@ -288,7 +316,7 @@ function importarHojas(tipo: Carpeta['tipo'], nombreFichero: string, hojas: Hoja
         if (ctx.clavesMovimiento.has(clave)) { omitidas++; continue; }
         ctx.clavesMovimiento.add(clave);
         ctx.nuevos.movimientos.push({
-          id: uid(), fecha, concepto, importe, tipo: tipoMov,
+          id: uid(), fecha, concepto, importe, tipo: tipoMovimiento(ruta, importe),
           cuenta: nombreFichero.replace(/\.[^.]+$/, ''),
         });
         filas++;
@@ -308,7 +336,7 @@ function importarHojas(tipo: Carpeta['tipo'], nombreFichero: string, hojas: Hoja
         ctx.nuevos.gastos.push({
           id: uid(), fecha,
           contactoId: proveedor ? contactoId(ctx, proveedor, 'proveedor') : undefined,
-          concepto, categoria: 'Otros', base, ivaPct,
+          concepto, categoria: categoriaPorRuta(ruta), base, ivaPct,
           total: r2(base * (1 + ivaPct / 100)),
           estado: 'pagado', fechaPago: fecha,
         });
@@ -319,11 +347,56 @@ function importarHojas(tipo: Carpeta['tipo'], nombreFichero: string, hojas: Hoja
   return { filas, omitidas };
 }
 
+// ---------- localización de ficheros en SharePoint ----------
+// Elige la biblioteca de documentos: la estándar del sitio o, si se configuró
+// SP_BIBLIOTECA, la que tenga ese nombre (p. ej. "EasyREM CORE").
+async function elegirDrive(deps: Deps, tok: string, siteId: string): Promise<any> {
+  if (!deps.biblioteca) return await graph(deps, tok, `/sites/${siteId}/drive`);
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const res = await graph(deps, tok, `/sites/${siteId}/drives?$select=id,name`);
+  const drive = (res.value || []).find((d: any) => norm(d.name) === norm(deps.biblioteca!));
+  if (!drive) {
+    const nombres = (res.value || []).map((d: any) => d.name).join(', ') || '(ninguna)';
+    throw new Error(`Biblioteca "${deps.biblioteca}" no encontrada en el sitio. Disponibles: ${nombres}`);
+  }
+  return drive;
+}
+
+const CARPETAS_IGNORADAS = /\b(old|antiguos?|antiguas?|backups?|copias?|papelera|borradores)\b/i;
+
+// Lista los ficheros de una ruta. Si la ruta apunta a un fichero, devuelve solo
+// ese. Si es una carpeta, la recorre con sus subcarpetas (hasta 4 niveles),
+// ignorando las de nombre old/antiguo/backup/copia, y siguiendo la paginación.
+async function listarFicheros(deps: Deps, tok: string, driveId: string, ruta: string): Promise<{ item: any; ruta: string }[]> {
+  const codificada = ruta.split('/').map(encodeURIComponent).join('/');
+  const raiz = await graph(deps, tok, `/drives/${driveId}/root:/${codificada}`);
+  if (raiz.file) return [{ item: raiz, ruta: raiz.name }];
+  const ficheros: { item: any; ruta: string }[] = [];
+  const pendientes = [{ id: raiz.id as string, ruta: '', nivel: 0 }];
+  while (pendientes.length) {
+    const dir = pendientes.shift()!;
+    let path = `/drives/${driveId}/items/${dir.id}/children?$select=id,name,eTag,file,folder&$top=200`;
+    while (path) {
+      const res = await graph(deps, tok, path);
+      for (const item of res.value || []) {
+        const rutaItem = dir.ruta ? `${dir.ruta}/${item.name}` : item.name;
+        if (item.file) ficheros.push({ item, ruta: rutaItem });
+        else if (item.folder && dir.nivel < 4 && !CARPETAS_IGNORADAS.test(item.name)) {
+          pendientes.push({ id: item.id, ruta: rutaItem, nivel: dir.nivel + 1 });
+        }
+      }
+      const next = res['@odata.nextLink'];
+      path = next ? String(next).replace('https://graph.microsoft.com/v1.0', '') : '';
+    }
+  }
+  return ficheros;
+}
+
 // ---------- proceso principal ----------
 export async function procesar(deps: Deps): Promise<any> {
   const tok = await tokenGraph(deps);
   const site = await graph(deps, tok, `/sites/${deps.site}`);
-  const drive = await graph(deps, tok, `/sites/${site.id}/drive`);
+  const drive = await elegirDrive(deps, tok, site.id);
 
   const registroFilas = await pg(deps, 'ingesta_ficheros?select=id,etag');
   const registro = new Map(registroFilas.map((r: any) => [r.id, r.etag]));
@@ -333,19 +406,15 @@ export async function procesar(deps: Deps): Promise<any> {
   const registrosNuevos: any[] = [];
 
   for (const carpeta of deps.carpetas) {
-    let items: any[];
+    let ficheros: { item: any; ruta: string }[];
     try {
-      const res = await graph(
-        deps, tok,
-        `/drives/${drive.id}/root:/${carpeta.ruta.split('/').map(encodeURIComponent).join('/')}:/children?$select=id,name,eTag,file,size`
-      );
-      items = (res.value || []).filter((i: any) => i.file);
+      ficheros = await listarFicheros(deps, tok, drive.id, carpeta.ruta);
     } catch (e) {
       resumen.push({ carpeta: carpeta.ruta, error: (e as Error).message });
       continue;
     }
 
-    for (const item of items) {
+    for (const { item, ruta } of ficheros) {
       if (registro.get(item.id) === item.eTag) continue; // sin cambios
       const ext = (item.name.split('.').pop() || '').toLowerCase();
       let estado = 'ignorado', filas = 0, mensaje = `Extensión .${ext} no soportada`;
@@ -353,23 +422,25 @@ export async function procesar(deps: Deps): Promise<any> {
         if (['xlsx', 'xls', 'csv', 'ods'].includes(ext)) {
           const bytes = await descargar(deps, tok, drive.id, item.id);
           const hojas = await deps.parseWorkbook(bytes);
-          const r = importarHojas(carpeta.tipo, item.name, hojas, ctx);
+          const r = importarHojas(carpeta.tipo, ruta, hojas, ctx);
           estado = 'importado';
           filas = r.filas;
           mensaje = `${r.filas} filas nuevas · ${r.omitidas} omitidas (duplicadas o incompletas)`;
         } else if (ext === 'pdf') {
           estado = 'pdf_pendiente';
-          mensaje = 'PDF registrado. Procésalo con Claude + MCP (o actívese Document Intelligence).';
+          mensaje = carpeta.tipo === 'gastos'
+            ? `PDF registrado (categoría sugerida: ${categoriaPorRuta(ruta)}). Procésalo con Claude + MCP.`
+            : 'PDF registrado. Procésalo con Claude + MCP (o actívese Document Intelligence).';
         }
       } catch (e) {
         estado = 'error';
         mensaje = (e as Error).message;
       }
       registrosNuevos.push({
-        id: item.id, nombre: item.name, carpeta: carpeta.ruta, etag: item.eTag,
+        id: item.id, nombre: ruta, carpeta: carpeta.ruta, etag: item.eTag,
         estado, filas, mensaje, procesado_at: new Date().toISOString(),
       });
-      resumen.push({ fichero: item.name, carpeta: carpeta.ruta, estado, filas, mensaje });
+      resumen.push({ fichero: ruta, carpeta: carpeta.ruta, estado, filas, mensaje });
     }
   }
 
@@ -444,11 +515,12 @@ if (typeof Deno !== 'undefined' && Deno?.serve) {
       };
     });
   };
-  const env = (k: string) => Deno.env.get(k) || '';
+  const env = (k: string) => (Deno.env.get(k) || '').trim();
+  const rutas = (k: string) => env(k).split(';').map((r: string) => r.trim().replace(/^\/+|\/+$/g, '')).filter(Boolean);
   const carpetas: Carpeta[] = [];
-  if (env('SP_CARPETA_FACTURAS')) carpetas.push({ ruta: env('SP_CARPETA_FACTURAS'), tipo: 'facturas' });
-  if (env('SP_CARPETA_BANCO')) carpetas.push({ ruta: env('SP_CARPETA_BANCO'), tipo: 'banco' });
-  if (env('SP_CARPETA_GASTOS')) carpetas.push({ ruta: env('SP_CARPETA_GASTOS'), tipo: 'gastos' });
+  for (const ruta of rutas('SP_CARPETA_FACTURAS')) carpetas.push({ ruta, tipo: 'facturas' });
+  for (const ruta of rutas('SP_CARPETA_BANCO')) carpetas.push({ ruta, tipo: 'banco' });
+  for (const ruta of rutas('SP_CARPETA_GASTOS')) carpetas.push({ ruta, tipo: 'gastos' });
   Deno.serve((req: Request) =>
     handleIngesta(req, {
       url: env('SUPABASE_URL'),
@@ -457,6 +529,7 @@ if (typeof Deno !== 'undefined' && Deno?.serve) {
       client: env('MS_CLIENT_ID'),
       secret: env('MS_CLIENT_SECRET'),
       site: env('SP_SITE'),
+      biblioteca: env('SP_BIBLIOTECA'),
       carpetas,
       fetchFn: fetch,
       parseWorkbook,

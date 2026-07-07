@@ -140,11 +140,20 @@ Activación:
    [`supabase/functions/ingesta/index.ts`](supabase/functions/ingesta/index.ts)
    (desactiva "Verify JWT") y define los secrets: `MS_TENANT_ID`,
    `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `SP_SITE`
-   (p. ej. `miempresa.sharepoint.com:/sites/Contabilidad`),
-   `SP_CARPETA_FACTURAS`, `SP_CARPETA_BANCO` y opcionalmente `SP_CARPETA_GASTOS`.
+   (p. ej. `miempresa.sharepoint.com:/sites/CEO`), `SP_BIBLIOTECA` (opcional,
+   nombre de la biblioteca de documentos si no es la estándar, p. ej.
+   `EasyREM CORE`), `SP_CARPETA_FACTURAS`, `SP_CARPETA_BANCO` y opcionalmente
+   `SP_CARPETA_GASTOS`.
 4. Prográmala cada hora: Dashboard → Integrations → Cron → HTTP request a la
    función con cabecera `Authorization: Bearer <service_role key>`.
 
-El tipo de movimiento bancario se deduce del nombre del fichero (contiene
-"tarjeta", "emitidas" o "recibidas"; si no, cuenta), y cada fichero queda
-anotado en la tabla `ingesta_ficheros` con su resultado.
+Cada `SP_CARPETA_*` puede ser una carpeta (se recorre con todas sus
+subcarpetas, ignorando las llamadas `old`, `Antiguo`, `backup` o `copia`), un
+fichero concreto (útil para apuntar solo a tu Excel maestro de facturas) o
+varias rutas separadas por `;`. El tipo de movimiento bancario se deduce de la
+ruta completa — carpeta o fichero que contenga "tarjeta", "emitidas" o
+"recibidas"; si solo dice "transferencias", decide el signo del importe; si
+no, cuenta. La categoría de gasto se sugiere por la carpeta donde vive el
+fichero (p. ej. `Oca` → OCA / Inspecciones, `colaboradores` → Colaboradores,
+`visitas` → Desplazamientos y dietas). Cada fichero queda anotado en la tabla
+`ingesta_ficheros` con su resultado.
