@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppData } from '../lib/store';
 import { useDatosVisibles } from '../lib/vista';
 import { rentabilidadProyectos, totalesRentabilidad, Rango, RentabilidadProyecto } from '../lib/rentabilidad';
+import { facturasCerradas } from '../lib/liquidacion';
 import { fmtEur, fmtDate } from '../lib/format';
 import { Card, PageTitle, Table, Badge, badgeEstado, Empty, inputCls, Btn } from '../components/ui';
 
@@ -103,6 +104,16 @@ const Rentabilidad: React.FC = () => {
   const usarRango = rango.desde || rango.hasta ? rango : undefined;
   const filas = useMemo(() => rentabilidadProyectos(data, usarRango), [data, rango]);
   const tot = useMemo(() => totalesRentabilidad(filas), [filas]);
+  const cerradas = useMemo(() => facturasCerradas(data, usarRango), [data, rango]);
+  const totCerradas = useMemo(
+    () => ({
+      base: cerradas.reduce((s, c) => s + c.d.baseImponible, 0),
+      gastos: cerradas.reduce((s, c) => s + c.d.totalGastos, 0),
+      reparto: cerradas.reduce((s, c) => s + c.d.totalAPagar, 0),
+      beneficio: cerradas.reduce((s, c) => s + c.beneficio, 0),
+    }),
+    [cerradas]
+  );
 
   const setPreset = (d: string, h: string) => setRango({ desde: d, hasta: h });
 
@@ -173,6 +184,82 @@ const Rentabilidad: React.FC = () => {
         <KpiCard label="Gastos pendientes de pago" value={fmtEur(tot.gastosPendientes)} tone={tot.gastosPendientes > 0 ? 'neg' : 'neutral'} sub="Proveedores" />
         <KpiCard label="Pendiente de liquidar" value={fmtEur(tot.liqPendiente)} tone={tot.liqPendiente > 0 ? 'neg' : 'neutral'} sub="Colaboradores (devengado)" />
       </div>
+
+      <Card className="mb-5">
+        <div className="px-4 pt-4 flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h3 className="font-semibold text-gray-800 mb-1">Facturas cerradas: beneficio real</h3>
+            <p className="text-xs text-gray-500 mb-2">
+              Facturas cobradas con todos los pagos hechos a proveedores y colaboradores en el periodo
+              elegido. El beneficio es lo que queda en la empresa: base − gastos imputados − comisión
+              comercial − reparto.
+            </p>
+          </div>
+          {cerradas.length > 0 && (
+            <div className="text-right">
+              <div className={`text-xl font-bold ${totCerradas.beneficio >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {fmtEur(totCerradas.beneficio)}
+              </div>
+              <div className="text-xs text-gray-400">
+                {cerradas.length} factura{cerradas.length === 1 ? '' : 's'} cerrada{cerradas.length === 1 ? '' : 's'}
+              </div>
+            </div>
+          )}
+        </div>
+        {cerradas.length === 0 ? (
+          <Empty>
+            No hay facturas totalmente cerradas en el periodo. Una factura se cierra cuando está cobrada
+            y todo pagado (pestaña Liquidaciones).
+          </Empty>
+        ) : (
+          <Table headers={['Factura', 'Fecha', 'Cliente', 'Base', 'Gastos', 'Comercial', 'Colaboradores', 'Beneficio neto', 'Margen']}>
+            {cerradas.map((c) => {
+              const comercial = c.d.lineas
+                .filter((l) => l.rol === 'comercial')
+                .reduce((s, l) => s + l.importe, 0);
+              const colaboradores = c.d.totalAPagar - comercial;
+              return (
+                <tr key={c.d.factura.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {c.d.factura.numero}{' '}
+                    <Badge color={c.motivo === 'liquidada' ? 'green' : 'blue'}>
+                      {c.motivo === 'liquidada' ? 'liquidada' : 'todo pagado'}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{fmtDate(c.d.factura.fecha)}</td>
+                  <td className="px-3 py-2 text-gray-600">{c.clienteNombre}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{fmtEur(c.d.baseImponible)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{fmtEur(c.d.totalGastos)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{fmtEur(comercial)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{fmtEur(colaboradores)}</td>
+                  <td className={`px-3 py-2 font-semibold whitespace-nowrap ${c.beneficio >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {fmtEur(c.beneficio)}
+                  </td>
+                  <td className={`px-3 py-2 whitespace-nowrap ${c.margen >= 0 ? 'text-gray-700' : 'text-red-600'}`}>
+                    {(c.margen * 100).toFixed(1)}%
+                  </td>
+                </tr>
+              );
+            })}
+            <tr className="border-t-2 border-gray-300 font-semibold bg-gray-50">
+              <td className="px-3 py-2" colSpan={3}>
+                TOTAL CERRADO
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">{fmtEur(totCerradas.base)}</td>
+              <td className="px-3 py-2 whitespace-nowrap">{fmtEur(totCerradas.gastos)}</td>
+              <td className="px-3 py-2 whitespace-nowrap" colSpan={2}>
+                {fmtEur(totCerradas.reparto)}
+              </td>
+              <td className={`px-3 py-2 whitespace-nowrap ${totCerradas.beneficio >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                {fmtEur(totCerradas.beneficio)}
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                {totCerradas.base > 0 ? `${((totCerradas.beneficio / totCerradas.base) * 100).toFixed(1)}%` : '—'}
+              </td>
+            </tr>
+          </Table>
+        )}
+      </Card>
 
       <Card>
         <div className="px-4 pt-4">

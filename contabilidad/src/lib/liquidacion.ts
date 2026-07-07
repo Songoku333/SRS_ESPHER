@@ -144,6 +144,41 @@ export function facturasPorLiquidar(data: AppData): DesgloseFactura[] {
     .sort((a, b) => b.factura.fecha.localeCompare(a.factura.fecha));
 }
 
+export interface FacturaCerrada {
+  d: DesgloseFactura;
+  clienteNombre: string;
+  /** base − gastos imputados − comercial − reparto: lo que queda en la empresa */
+  beneficio: number;
+  margen: number; // sobre la base imponible (0-1)
+  motivo: 'liquidada' | 'pagos'; // marcada liquidada vs. todo pagado sin marcar
+}
+
+/** Facturas completamente cerradas en el rango: cobradas y con todos los pagos
+ *  hechos (marcadas liquidadas, o con reparto y gastos íntegramente pagados),
+ *  con su beneficio neto real para la empresa. */
+export function facturasCerradas(
+  data: AppData,
+  rango?: { desde?: string; hasta?: string }
+): FacturaCerrada[] {
+  const nombre = (id?: string) => data.contactos.find((c) => c.id === id)?.nombre || '—';
+  return data.facturas
+    .filter((f) => f.estado === 'cobrada')
+    .filter((f) => (!rango?.desde || f.fecha >= rango.desde) && (!rango?.hasta || f.fecha <= rango.hasta))
+    .map((f) => desgloseFactura(data, f))
+    .filter((d) => d.liquidada || (d.todoPagado && d.gastos.every((g) => g.estado === 'pagado')))
+    .map((d) => {
+      const beneficio = r2(d.baseImponible - d.totalGastos - d.totalAPagar);
+      return {
+        d,
+        clienteNombre: nombre(d.factura.clienteId),
+        beneficio,
+        margen: d.baseImponible > 0 ? beneficio / d.baseImponible : 0,
+        motivo: d.liquidada ? ('liquidada' as const) : ('pagos' as const),
+      };
+    })
+    .sort((a, b) => b.d.factura.fecha.localeCompare(a.d.factura.fecha));
+}
+
 /** Coste de reparto (comercial + colaboradores) atribuible a una factura, para la rentabilidad. */
 export function repartoPagableFactura(data: AppData, factura: Factura): number {
   return desgloseFactura(data, factura).totalAPagar;
