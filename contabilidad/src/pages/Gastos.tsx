@@ -3,6 +3,7 @@ import { useAppData, setState, uid, ensureContacto } from '../lib/store';
 import { useDatosVisibles } from '../lib/vista';
 import { Gasto, EstadoGasto, CategoriaGasto, CATEGORIAS_GASTO } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
+import { sugerirImputaciones, SugerenciaImputacion } from '../lib/imputacion';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
 
 interface FormGasto {
@@ -117,6 +118,23 @@ const Gastos: React.FC = () => {
 
   const totalPendiente = data.gastos.filter((g) => g.estado === 'pendiente').reduce((s, g) => s + g.total, 0);
 
+  const sugerencias = useMemo(() => sugerirImputaciones(data), [data]);
+
+  const imputar = (s: SugerenciaImputacion) => {
+    setState((p) => ({
+      ...p,
+      gastos: p.gastos.map((g) =>
+        g.id === s.gasto.id
+          ? { ...g, facturaId: s.factura?.id ?? g.facturaId, proyectoId: s.proyecto?.id ?? s.factura?.proyectoId ?? g.proyectoId }
+          : g
+      ),
+      // De paso, conciliamos el movimiento bancario del pago con este gasto
+      movimientos: p.movimientos.map((m) =>
+        m.id === s.movimiento.id && !m.conciliacion ? { ...m, conciliacion: { tipo: 'gasto', id: s.gasto.id } } : m
+      ),
+    }));
+  };
+
   return (
     <div>
       <PageTitle
@@ -124,6 +142,45 @@ const Gastos: React.FC = () => {
         subtitle={`${fmtEur(totalPendiente)} pendiente de pago`}
         actions={<Btn onClick={() => abrir()}>+ Nuevo gasto</Btn>}
       />
+
+      {sugerencias.length > 0 && (
+        <Card className="mb-4 border-teal-200 bg-teal-50/40">
+          <div className="px-4 pt-3 pb-1 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-gray-800">
+                Sugerencias de imputación desde el banco ({sugerencias.length})
+              </h3>
+              <p className="text-xs text-gray-500">
+                He encontrado el pago de estos gastos en el banco y su concepto lleva la referencia de la
+                factura o del proyecto. Revisa y confirma.
+              </p>
+            </div>
+            <Btn onClick={() => sugerencias.forEach(imputar)}>Imputar todas</Btn>
+          </div>
+          <ul className="divide-y divide-teal-100">
+            {sugerencias.map((s) => (
+              <li key={s.gasto.id} className="px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <span className="font-medium whitespace-nowrap">{fmtDate(s.gasto.fecha)}</span>
+                <span className="truncate max-w-[180px]" title={s.gasto.concepto}>
+                  {nombreContacto(s.gasto.contactoId)} · {fmtEur(s.gasto.total)}
+                </span>
+                <span className="text-gray-400">→</span>
+                <span className="text-gray-600 truncate max-w-[280px]" title={`${s.movimiento.concepto} · ${s.motivo}`}>
+                  {s.movimiento.concepto}
+                </span>
+                <span className="text-gray-400">→</span>
+                <Badge color="green">
+                  {s.factura ? `Factura ${s.factura.numero}` : `Proyecto ${s.proyecto?.codigo}`}
+                </Badge>
+                <span className="flex-1" />
+                <Btn variant="ghost" onClick={() => imputar(s)}>
+                  Imputar
+                </Btn>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-4">
         <input className={`${inputCls} max-w-xs`} placeholder="Buscar concepto o proveedor..." value={busca} onChange={(e) => setBusca(e.target.value)} />
