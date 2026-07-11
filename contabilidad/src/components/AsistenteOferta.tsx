@@ -7,6 +7,8 @@ import {
   evaluarPrecio,
   ajustarHorasAPrecio,
   construirEstimacion,
+  referenciaMercado,
+  precioMercadoEquipo,
   Complejidad,
   ParametrosPresupuesto,
   MIN_FACTURAS,
@@ -44,6 +46,7 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
   const [notas, setNotas] = useState<string[]>([]);
 
   const b = benchmarks[linea];
+  const mercado = referenciaMercado(linea);
 
   const generar = () => {
     const objetivo = num(precioObjetivo) || undefined;
@@ -133,22 +136,33 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
           </Field>
         </div>
 
-        {/* Base de conocimiento */}
-        <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm">
-          <div className="font-medium text-sky-900 mb-1">📚 Tu histórico en «{linea}»</div>
-          {b.nFacturas === 0 ? (
-            <p className="text-sky-800">Sin facturas clasificadas en esta línea todavía: usaré precios medios de mercado. La estimación mejorará sola a medida que factures e imputes gastos.</p>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sky-900">
-              <div><span className="text-xs text-sky-600 block">Facturas</span>{b.nFacturas}</div>
-              <div><span className="text-xs text-sky-600 block">Ticket medio</span>{fmtEur(b.ticketMedio)}</div>
-              <div><span className="text-xs text-sky-600 block">Coste directo real</span>{b.pctGastosDirectos !== null ? fmtPct(b.pctGastosDirectos) : '—'}</div>
-              <div><span className="text-xs text-sky-600 block">Margen real (cerradas)</span>{b.margenReal !== null ? fmtPct(b.margenReal) : '—'}</div>
+        {/* Base de conocimiento: tu histórico + referencia oficial de mercado */}
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm">
+            <div className="font-medium text-sky-900 mb-1">📚 Tu histórico en «{linea}»</div>
+            {b.nFacturas === 0 ? (
+              <p className="text-sky-800">Sin facturas clasificadas en esta línea todavía: usaré la referencia de mercado. La estimación mejorará sola a medida que factures e imputes gastos.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 text-sky-900">
+                <div><span className="text-xs text-sky-600 block">Facturas</span>{b.nFacturas}</div>
+                <div><span className="text-xs text-sky-600 block">Ticket medio</span>{fmtEur(b.ticketMedio)}</div>
+                <div><span className="text-xs text-sky-600 block">Coste directo real</span>{b.pctGastosDirectos !== null ? fmtPct(b.pctGastosDirectos) : '—'}</div>
+                <div><span className="text-xs text-sky-600 block">Margen real (cerradas)</span>{b.margenReal !== null ? fmtPct(b.margenReal) : '—'}</div>
+              </div>
+            )}
+            {b.nFacturas > 0 && b.nFacturas < MIN_FACTURAS && (
+              <p className="text-xs text-sky-700 mt-1">Con menos de {MIN_FACTURAS} facturas el asistente aún se apoya en tarifas de mercado.</p>
+            )}
+          </div>
+          <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm">
+            <div className="font-medium text-violet-900 mb-1">🇪🇸 Mercado España (referencia)</div>
+            <div className="grid grid-cols-2 gap-2 text-violet-900">
+              <div><span className="text-xs text-violet-600 block">Venta media</span>{mercado.ventaMediaHora.toFixed(0)} €/h</div>
+              <div><span className="text-xs text-violet-600 block">Coste colaborador medio</span>{mercado.costeMedioHora.toFixed(0)} €/h</div>
+              <div className="col-span-2"><span className="text-xs text-violet-600 block">Ticket típico del trabajo</span>{fmtEur(mercado.ticketMercado[0])} – {fmtEur(mercado.ticketMercado[1])}</div>
             </div>
-          )}
-          {b.nFacturas > 0 && b.nFacturas < MIN_FACTURAS && (
-            <p className="text-xs text-sky-700 mt-1">Con menos de {MIN_FACTURAS} facturas el asistente aún se apoya en tarifas de mercado.</p>
-          )}
+            <p className="text-xs text-violet-700 mt-1">Medias orientativas del sector en España (honorarios liberalizados); editables por rol en la tabla.</p>
+          </div>
         </div>
 
         {!params ? (
@@ -179,6 +193,7 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
                     <th className="py-1">Rol / disciplina</th>
                     <th className="py-1 w-24">Horas</th>
                     <th className="py-1 w-28">Coste €/h</th>
+                    <th className="py-1 w-24" title="Tarifa de venta media de mercado en España para este rol">Venta mercado</th>
                     <th className="py-1 w-28 text-right">Coste</th>
                   </tr>
                 </thead>
@@ -192,12 +207,14 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
                       <td>
                         <input type="number" step="0.5" min="0" className={`${inputCls} py-1`} value={e.costeHora} onChange={(ev) => setEquipo(i, 'costeHora', num(ev.target.value))} />
                       </td>
+                      <td className="text-violet-700 text-xs whitespace-nowrap">{e.ventaHora ? `${e.ventaHora} €/h` : '—'}</td>
                       <td className="text-right whitespace-nowrap">{fmtEur(e.horas * e.costeHora)}</td>
                     </tr>
                   ))}
                   <tr className="font-medium">
                     <td className="py-1">Total equipo</td>
                     <td>{resultado!.totalHoras} h</td>
+                    <td></td>
                     <td></td>
                     <td className="text-right">{fmtEur(resultado!.costeEquipo)}</td>
                   </tr>
@@ -271,6 +288,21 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
                 <div><span className="text-xs text-gray-500 block">Precio recomendado</span><span className="font-semibold text-teal-700">{fmtEur(resultado!.precioRecomendado)}</span></div>
                 <div><span className="text-xs text-gray-500 block">Tarifa efectiva</span><span className="font-medium">{resultado!.tarifaEfectiva > 0 ? `${resultado!.tarifaEfectiva.toFixed(0)} €/h` : '—'}</span></div>
               </div>
+              {(() => {
+                const pm = precioMercadoEquipo(params.equipo) + resultado!.gastosDirectos;
+                if (pm <= 0 || importeFinal <= 0) return null;
+                const dif = (importeFinal - pm) / pm;
+                return (
+                  <p className="text-xs text-violet-700">
+                    🇪🇸 Este trabajo a precio de mercado ({resultado!.totalHoras} h × tarifas de venta + gastos directos): {fmtEur(pm)} —{' '}
+                    {Math.abs(dif) < 0.05
+                      ? 'tu precio está en línea con el mercado.'
+                      : dif > 0
+                        ? `tu precio va un ${fmtPct(dif)} por encima.`
+                        : `tu precio va un ${fmtPct(-dif)} por debajo: tienes recorrido para subirlo.`}
+                  </p>
+                );
+              })()}
               {evalObjetivo && (
                 <div className={`mt-2 rounded border px-3 py-2 ${semaforo(evalObjetivo.margen)}`}>
                   A tu precio objetivo de {fmtEur(objetivo)}: beneficio neto {fmtEur(evalObjetivo.beneficio)} ({fmtPct(evalObjetivo.margen)})
