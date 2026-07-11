@@ -35,7 +35,7 @@ export type EstadoOferta = 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
 
 /** Desglose de costes y recursos con el que se preparó una oferta (asistente). */
 export interface EstimacionOferta {
-  equipo: { rol: string; horas: number; costeHora: number }[];
+  equipo: { rol: string; horas: number; costeHora: number; ventaHora?: number }[];
   gastos: { concepto: string; categoria: CategoriaGasto; base: number }[];
   contingenciaPct: number;
   comercialPct: number;

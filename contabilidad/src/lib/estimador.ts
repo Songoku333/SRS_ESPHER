@@ -111,6 +111,30 @@ export interface LineaEquipo {
   rol: string;
   horas: number;
   costeHora: number; // €/h pagado al colaborador
+  ventaHora?: number; // €/h de venta de mercado (referencia, no entra en el cálculo)
+}
+
+/** Referencia "oficial" de mercado en España para una línea de servicio:
+ *  tarifas medias ponderadas por el mix de roles y ticket típico. */
+export interface ReferenciaMercado {
+  costeMedioHora: number; // €/h medio pagado a colaboradores
+  ventaMediaHora: number; // €/h medio de venta al cliente
+  ticketMercado: [number, number]; // rango típico de honorarios (base €)
+}
+
+export function referenciaMercado(linea: LineaServicio): ReferenciaMercado {
+  const pl = PLANTILLAS[linea] ?? PLANTILLAS['Otros'];
+  const pesos = pl.roles.reduce((s, r) => s + r.pesoHoras, 0) || 1;
+  return {
+    costeMedioHora: r2(pl.roles.reduce((s, r) => s + r.costeHora * r.pesoHoras, 0) / pesos),
+    ventaMediaHora: r2(pl.roles.reduce((s, r) => s + r.ventaHora * r.pesoHoras, 0) / pesos),
+    ticketMercado: pl.ticketMercado,
+  };
+}
+
+/** Lo que costaría este trabajo a precio de mercado: horas × tarifa de venta media. */
+export function precioMercadoEquipo(equipo: LineaEquipo[]): number {
+  return r2(equipo.reduce((s, e) => s + e.horas * (e.ventaHora ?? 0), 0));
 }
 
 export interface GastoPrevisto {
@@ -203,6 +227,7 @@ export function equipoSugerido(linea: LineaServicio, totalHoras: number): LineaE
     rol: rol.nombre,
     horas: Math.max(1, r0((totalHoras * rol.pesoHoras) / 100)),
     costeHora: rol.costeHora,
+    ventaHora: rol.ventaHora,
   }));
 }
 

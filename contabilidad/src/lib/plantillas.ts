@@ -10,6 +10,7 @@ export interface RolPlantilla {
   nombre: string;
   pesoHoras: number; // % del total de horas estimadas
   costeHora: number; // €/h que se paga al colaborador (precio medio de mercado, editable)
+  ventaHora: number; // €/h de venta al cliente (precio medio de mercado en España)
 }
 
 export interface GastoPlantilla {
@@ -21,6 +22,7 @@ export interface GastoPlantilla {
 
 export interface Plantilla {
   eurPorHora: number; // tarifa media efectiva para estimar las horas totales
+  ticketMercado: [number, number]; // rango típico de honorarios en España (base €)
   comercialPct: number;
   generalesPct: number;
   roles: RolPlantilla[];
@@ -30,13 +32,14 @@ export interface Plantilla {
 export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Ingeniería MEP': {
     eurPorHora: 45,
+    ticketMercado: [5000, 45000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Ingeniero proyectista', pesoHoras: 45, costeHora: 35 },
-      { nombre: 'Modelador BIM / Delineante', pesoHoras: 30, costeHora: 28 },
-      { nombre: 'Director / Revisor de proyecto', pesoHoras: 15, costeHora: 50 },
-      { nombre: 'Tramitador administrativo', pesoHoras: 10, costeHora: 22 },
+      { nombre: 'Ingeniero proyectista', pesoHoras: 45, costeHora: 35, ventaHora: 55 },
+      { nombre: 'Modelador BIM / Delineante', pesoHoras: 30, costeHora: 28, ventaHora: 40 },
+      { nombre: 'Director / Revisor de proyecto', pesoHoras: 15, costeHora: 50, ventaHora: 80 },
+      { nombre: 'Tramitador administrativo', pesoHoras: 10, costeHora: 22, ventaHora: 32 },
     ],
     gastos: [
       { concepto: 'Visado colegial', categoria: 'Visados y colegios', modo: 'pct', valor: 1.0 },
@@ -47,13 +50,14 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   Legalizaciones: {
     eurPorHora: 42,
+    ticketMercado: [1500, 8000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Ingeniero', pesoHoras: 50, costeHora: 35 },
-      { nombre: 'Tramitador administrativo', pesoHoras: 25, costeHora: 22 },
-      { nombre: 'Director / Firma técnica', pesoHoras: 15, costeHora: 50 },
-      { nombre: 'Apoyo técnico', pesoHoras: 10, costeHora: 25 },
+      { nombre: 'Ingeniero', pesoHoras: 50, costeHora: 35, ventaHora: 55 },
+      { nombre: 'Tramitador administrativo', pesoHoras: 25, costeHora: 22, ventaHora: 32 },
+      { nombre: 'Director / Firma técnica', pesoHoras: 15, costeHora: 50, ventaHora: 80 },
+      { nombre: 'Apoyo técnico', pesoHoras: 10, costeHora: 25, ventaHora: 35 },
     ],
     gastos: [
       { concepto: 'OCA / inspección', categoria: 'OCA / Inspecciones', modo: 'fijo', valor: 350 },
@@ -64,12 +68,13 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   'Auditoría energética': {
     eurPorHora: 48,
+    ticketMercado: [2500, 12000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Auditor energético', pesoHoras: 45, costeHora: 40 },
-      { nombre: 'Técnico de campo / mediciones', pesoHoras: 30, costeHora: 28 },
-      { nombre: 'Analista de datos', pesoHoras: 25, costeHora: 30 },
+      { nombre: 'Auditor energético', pesoHoras: 45, costeHora: 40, ventaHora: 60 },
+      { nombre: 'Técnico de campo / mediciones', pesoHoras: 30, costeHora: 28, ventaHora: 40 },
+      { nombre: 'Analista de datos', pesoHoras: 25, costeHora: 30, ventaHora: 45 },
     ],
     gastos: [
       { concepto: 'Alquiler de equipos de medición', categoria: 'Material y equipos', modo: 'fijo', valor: 250 },
@@ -79,12 +84,13 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   'Modelado y simulación energética': {
     eurPorHora: 50,
+    ticketMercado: [3000, 15000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Modelador energético (HULC/IDA/DesignBuilder)', pesoHoras: 50, costeHora: 38 },
-      { nombre: 'Ingeniero', pesoHoras: 30, costeHora: 35 },
-      { nombre: 'QA / Revisión', pesoHoras: 20, costeHora: 45 },
+      { nombre: 'Modelador energético (HULC/IDA/DesignBuilder)', pesoHoras: 50, costeHora: 38, ventaHora: 60 },
+      { nombre: 'Ingeniero', pesoHoras: 30, costeHora: 35, ventaHora: 55 },
+      { nombre: 'QA / Revisión', pesoHoras: 20, costeHora: 45, ventaHora: 65 },
     ],
     gastos: [
       { concepto: 'Licencias de software de simulación', categoria: 'Software y licencias', modo: 'pct', valor: 4.0 },
@@ -93,12 +99,13 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   'Consultoría fondos inmobiliarios': {
     eurPorHora: 65,
+    ticketMercado: [8000, 60000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Consultor senior', pesoHoras: 45, costeHora: 55 },
-      { nombre: 'Analista técnico', pesoHoras: 35, costeHora: 35 },
-      { nombre: 'Due diligence / Soporte', pesoHoras: 20, costeHora: 32 },
+      { nombre: 'Consultor senior', pesoHoras: 45, costeHora: 55, ventaHora: 90 },
+      { nombre: 'Analista técnico', pesoHoras: 35, costeHora: 35, ventaHora: 55 },
+      { nombre: 'Due diligence / Soporte', pesoHoras: 20, costeHora: 32, ventaHora: 45 },
     ],
     gastos: [
       { concepto: 'Desplazamientos y visitas a activos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 3.0 },
@@ -107,12 +114,13 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   'Consultoría residencial': {
     eurPorHora: 55,
+    ticketMercado: [4000, 25000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Consultor senior', pesoHoras: 40, costeHora: 55 },
-      { nombre: 'Técnico', pesoHoras: 40, costeHora: 30 },
-      { nombre: 'Soporte', pesoHoras: 20, costeHora: 25 },
+      { nombre: 'Consultor senior', pesoHoras: 40, costeHora: 55, ventaHora: 90 },
+      { nombre: 'Técnico', pesoHoras: 40, costeHora: 30, ventaHora: 45 },
+      { nombre: 'Soporte', pesoHoras: 20, costeHora: 25, ventaHora: 35 },
     ],
     gastos: [
       { concepto: 'Desplazamientos y visitas', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.5 },
@@ -121,12 +129,13 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   'Clima y sostenibilidad': {
     eurPorHora: 55,
+    ticketMercado: [5000, 30000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Consultor sostenibilidad (BREEAM/LEED)', pesoHoras: 45, costeHora: 45 },
-      { nombre: 'Técnico', pesoHoras: 35, costeHora: 30 },
-      { nombre: 'QA / Revisión', pesoHoras: 20, costeHora: 45 },
+      { nombre: 'Consultor sostenibilidad (BREEAM/LEED)', pesoHoras: 45, costeHora: 45, ventaHora: 75 },
+      { nombre: 'Técnico', pesoHoras: 35, costeHora: 30, ventaHora: 45 },
+      { nombre: 'QA / Revisión', pesoHoras: 20, costeHora: 45, ventaHora: 65 },
     ],
     gastos: [
       { concepto: 'Tasas de certificación (BREEAM/LEED/Passivhaus)', categoria: 'Tasas y licencias administrativas', modo: 'fijo', valor: 400 },
@@ -136,11 +145,12 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   },
   Otros: {
     eurPorHora: 45,
+    ticketMercado: [2000, 15000],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Ingeniero / Consultor', pesoHoras: 60, costeHora: 35 },
-      { nombre: 'Apoyo técnico', pesoHoras: 40, costeHora: 25 },
+      { nombre: 'Ingeniero / Consultor', pesoHoras: 60, costeHora: 35, ventaHora: 55 },
+      { nombre: 'Apoyo técnico', pesoHoras: 40, costeHora: 25, ventaHora: 35 },
     ],
     gastos: [{ concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.0 }],
   },
