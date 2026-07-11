@@ -4,6 +4,7 @@ import { useDatosVisibles } from '../lib/vista';
 import { Oferta, EstadoOferta, LineaServicio, LINEAS_SERVICIO } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
+import AsistenteOferta from '../components/AsistenteOferta';
 
 const ESTADOS: EstadoOferta[] = ['borrador', 'enviada', 'aceptada', 'rechazada'];
 
@@ -23,6 +24,7 @@ const Ofertas: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState<EstadoOferta | 'todas'>('todas');
   const [editando, setEditando] = useState<Oferta | null>(null);
   const [abierto, setAbierto] = useState(false);
+  const [asistente, setAsistente] = useState(false);
   const [form, setForm] = useState<FormOferta>(formVacio());
 
   function formVacio(): FormOferta {
@@ -90,6 +92,37 @@ const Ofertas: React.FC = () => {
     }
   };
 
+  /** Crea la oferta que sale del asistente, con su estimación y desglose. */
+  const crearDesdeAsistente = (r: {
+    clienteNombre: string;
+    titulo: string;
+    linea: LineaServicio;
+    importe: number;
+    estimacion: { estimacion: NonNullable<Oferta['estimacion']>; resumen: string };
+  }) => {
+    const clienteId = ensureContacto(r.clienteNombre, 'cliente');
+    const n = data?.ofertas?.length ?? 0;
+    setState((p) => ({
+      ...p,
+      ofertas: [
+        ...p.ofertas,
+        {
+          id: uid(),
+          codigo: `OF-${new Date().getFullYear()}-${String(n + 1).padStart(3, '0')}`,
+          clienteId,
+          titulo: r.titulo,
+          lineaServicio: r.linea,
+          importe: Math.round(r.importe * 100) / 100,
+          fecha: hoy(),
+          estado: 'borrador' as const,
+          notas: r.estimacion.resumen,
+          estimacion: r.estimacion.estimacion,
+        },
+      ],
+    }));
+    setAsistente(false);
+  };
+
   /** Acepta la oferta y crea el proyecto asociado en un paso. */
   const convertirEnProyecto = (o: Oferta) => {
     if (o.proyectoId) return;
@@ -108,6 +141,16 @@ const Ofertas: React.FC = () => {
           fechaInicio: hoy(),
           estado: 'activo' as const,
           repartos: [],
+          ...(o.estimacion
+            ? {
+                comercialPct: o.estimacion.comercialPct,
+                gastosGeneralesPct: o.estimacion.generalesPct,
+                modoReparto: 'horas' as const,
+                notas: `Presupuesto de horas de la oferta:\n${o.estimacion.equipo
+                  .map((e) => `· ${e.rol}: ${e.horas} h × ${e.costeHora} €/h`)
+                  .join('\n')}`,
+              }
+            : {}),
         },
       ],
       ofertas: p.ofertas.map((x) =>
@@ -130,7 +173,12 @@ const Ofertas: React.FC = () => {
       <PageTitle
         title="Ofertas"
         subtitle={`Pipeline comercial · ${fmtEur(totalVivas)} en ofertas vivas`}
-        actions={<Btn onClick={() => abrir()}>+ Nueva oferta</Btn>}
+        actions={
+          <div className="flex gap-2">
+            <Btn variant="secondary" onClick={() => setAsistente(true)}>🧮 Preparar oferta</Btn>
+            <Btn onClick={() => abrir()}>+ Nueva oferta</Btn>
+          </div>
+        }
       />
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -159,7 +207,17 @@ const Ofertas: React.FC = () => {
                 <td className="px-3 py-2">{nombreCliente(o.clienteId)}</td>
                 <td className="px-3 py-2">{o.titulo}</td>
                 <td className="px-3 py-2 text-gray-500 text-xs">{o.lineaServicio}</td>
-                <td className="px-3 py-2 font-medium whitespace-nowrap">{fmtEur(o.importe)}</td>
+                <td className="px-3 py-2 font-medium whitespace-nowrap">
+                  {fmtEur(o.importe)}
+                  {o.estimacion && (
+                    <span
+                      className={`ml-1 text-xs ${o.estimacion.margenPrevisto >= 0.15 ? 'text-green-600' : o.estimacion.margenPrevisto >= 0.05 ? 'text-amber-600' : 'text-red-600'}`}
+                      title={`Estimación: ${o.estimacion.totalHoras} h · coste equipo ${fmtEur(o.estimacion.costeEquipo)} · margen previsto ${(o.estimacion.margenPrevisto * 100).toFixed(1)}%`}
+                    >
+                      {(o.estimacion.margenPrevisto * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <Badge color={badgeEstado[o.estado]}>{o.estado}</Badge>
                 </td>
@@ -181,6 +239,15 @@ const Ofertas: React.FC = () => {
           </Table>
         )}
       </Card>
+
+      {asistente && (
+        <AsistenteOferta
+          data={data}
+          clientes={data.contactos.filter((c) => c.tipo === 'cliente')}
+          onCrear={crearDesdeAsistente}
+          onClose={() => setAsistente(false)}
+        />
+      )}
 
       {abierto && (
         <Modal title={editando ? 'Editar oferta' : 'Nueva oferta'} onClose={() => setAbierto(false)}>
