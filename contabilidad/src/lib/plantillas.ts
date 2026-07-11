@@ -9,6 +9,7 @@ import { CategoriaGasto, LineaServicio } from '../types';
 export interface RolPlantilla {
   nombre: string;
   pesoHoras: number; // % del total de horas estimadas
+  costeHora: number; // €/h que se paga al colaborador (precio medio de mercado, editable)
 }
 
 export interface GastoPlantilla {
@@ -32,10 +33,10 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Ingeniero proyectista', pesoHoras: 45 },
-      { nombre: 'Modelador BIM / Delineante', pesoHoras: 30 },
-      { nombre: 'Director / Revisor de proyecto', pesoHoras: 15 },
-      { nombre: 'Tramitador administrativo', pesoHoras: 10 },
+      { nombre: 'Ingeniero proyectista', pesoHoras: 45, costeHora: 35 },
+      { nombre: 'Modelador BIM / Delineante', pesoHoras: 30, costeHora: 28 },
+      { nombre: 'Director / Revisor de proyecto', pesoHoras: 15, costeHora: 50 },
+      { nombre: 'Tramitador administrativo', pesoHoras: 10, costeHora: 22 },
     ],
     gastos: [
       { concepto: 'Visado colegial', categoria: 'Visados y colegios', modo: 'pct', valor: 1.0 },
@@ -49,10 +50,10 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Ingeniero', pesoHoras: 50 },
-      { nombre: 'Tramitador administrativo', pesoHoras: 25 },
-      { nombre: 'Director / Firma técnica', pesoHoras: 15 },
-      { nombre: 'Apoyo técnico', pesoHoras: 10 },
+      { nombre: 'Ingeniero', pesoHoras: 50, costeHora: 35 },
+      { nombre: 'Tramitador administrativo', pesoHoras: 25, costeHora: 22 },
+      { nombre: 'Director / Firma técnica', pesoHoras: 15, costeHora: 50 },
+      { nombre: 'Apoyo técnico', pesoHoras: 10, costeHora: 25 },
     ],
     gastos: [
       { concepto: 'OCA / inspección', categoria: 'OCA / Inspecciones', modo: 'fijo', valor: 350 },
@@ -66,9 +67,9 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Auditor energético', pesoHoras: 45 },
-      { nombre: 'Técnico de campo / mediciones', pesoHoras: 30 },
-      { nombre: 'Analista de datos', pesoHoras: 25 },
+      { nombre: 'Auditor energético', pesoHoras: 45, costeHora: 40 },
+      { nombre: 'Técnico de campo / mediciones', pesoHoras: 30, costeHora: 28 },
+      { nombre: 'Analista de datos', pesoHoras: 25, costeHora: 30 },
     ],
     gastos: [
       { concepto: 'Alquiler de equipos de medición', categoria: 'Material y equipos', modo: 'fijo', valor: 250 },
@@ -81,9 +82,9 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Modelador energético (HULC/IDA/DesignBuilder)', pesoHoras: 50 },
-      { nombre: 'Ingeniero', pesoHoras: 30 },
-      { nombre: 'QA / Revisión', pesoHoras: 20 },
+      { nombre: 'Modelador energético (HULC/IDA/DesignBuilder)', pesoHoras: 50, costeHora: 38 },
+      { nombre: 'Ingeniero', pesoHoras: 30, costeHora: 35 },
+      { nombre: 'QA / Revisión', pesoHoras: 20, costeHora: 45 },
     ],
     gastos: [
       { concepto: 'Licencias de software de simulación', categoria: 'Software y licencias', modo: 'pct', valor: 4.0 },
@@ -95,9 +96,9 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Consultor senior', pesoHoras: 45 },
-      { nombre: 'Analista técnico', pesoHoras: 35 },
-      { nombre: 'Due diligence / Soporte', pesoHoras: 20 },
+      { nombre: 'Consultor senior', pesoHoras: 45, costeHora: 55 },
+      { nombre: 'Analista técnico', pesoHoras: 35, costeHora: 35 },
+      { nombre: 'Due diligence / Soporte', pesoHoras: 20, costeHora: 32 },
     ],
     gastos: [
       { concepto: 'Desplazamientos y visitas a activos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 3.0 },
@@ -109,9 +110,9 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Consultor senior', pesoHoras: 40 },
-      { nombre: 'Técnico', pesoHoras: 40 },
-      { nombre: 'Soporte', pesoHoras: 20 },
+      { nombre: 'Consultor senior', pesoHoras: 40, costeHora: 55 },
+      { nombre: 'Técnico', pesoHoras: 40, costeHora: 30 },
+      { nombre: 'Soporte', pesoHoras: 20, costeHora: 25 },
     ],
     gastos: [
       { concepto: 'Desplazamientos y visitas', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.5 },
@@ -123,9 +124,9 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Consultor sostenibilidad (BREEAM/LEED)', pesoHoras: 45 },
-      { nombre: 'Técnico', pesoHoras: 35 },
-      { nombre: 'QA / Revisión', pesoHoras: 20 },
+      { nombre: 'Consultor sostenibilidad (BREEAM/LEED)', pesoHoras: 45, costeHora: 45 },
+      { nombre: 'Técnico', pesoHoras: 35, costeHora: 30 },
+      { nombre: 'QA / Revisión', pesoHoras: 20, costeHora: 45 },
     ],
     gastos: [
       { concepto: 'Tasas de certificación (BREEAM/LEED/Passivhaus)', categoria: 'Tasas y licencias administrativas', modo: 'fijo', valor: 400 },
@@ -138,8 +139,8 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     comercialPct: 10,
     generalesPct: 20,
     roles: [
-      { nombre: 'Ingeniero / Consultor', pesoHoras: 60 },
-      { nombre: 'Apoyo técnico', pesoHoras: 40 },
+      { nombre: 'Ingeniero / Consultor', pesoHoras: 60, costeHora: 35 },
+      { nombre: 'Apoyo técnico', pesoHoras: 40, costeHora: 25 },
     ],
     gastos: [{ concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.0 }],
   },

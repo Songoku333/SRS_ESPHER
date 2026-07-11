@@ -33,6 +33,21 @@ export interface Contacto {
 
 export type EstadoOferta = 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
 
+/** Desglose de costes y recursos con el que se preparó una oferta (asistente). */
+export interface EstimacionOferta {
+  equipo: { rol: string; horas: number; costeHora: number }[];
+  gastos: { concepto: string; categoria: CategoriaGasto; base: number }[];
+  contingenciaPct: number;
+  comercialPct: number;
+  generalesPct: number;
+  margenObjetivoPct: number;
+  totalHoras: number;
+  costeEquipo: number;
+  gastosDirectos: number;
+  precioRecomendado: number;
+  margenPrevisto: number; // margen neto (0-1) al importe ofertado
+}
+
 export interface Oferta {
   id: string;
   codigo: string;
@@ -44,6 +59,7 @@ export interface Oferta {
   estado: EstadoOferta;
   proyectoId?: string;
   notas?: string;
+  estimacion?: EstimacionOferta;
 }
 
 /** Reparto de un proyecto con un proveedor o colaborador.
