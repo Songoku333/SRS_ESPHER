@@ -238,6 +238,24 @@ export const FACTOR_COMPLEJIDAD: Record<Complejidad, number> = {
   complejo: 1.3,
 };
 
+/** Horas de mercado para un activo de S m²: curva coef·S^exp con economía de
+ *  escala (exp < 1), corregida por complejidad. */
+export function horasPorSuperficie(linea: LineaServicio, m2: number, complejidad: Complejidad): number {
+  const c = (PLANTILLAS[linea] ?? PLANTILLAS['Otros']).superficie;
+  return r0(Math.max(c.horasMin, c.coef * Math.pow(m2, c.exp)) * FACTOR_COMPLEJIDAD[complejidad]);
+}
+
+/** €/m² real de tu histórico de ofertas con superficie en esta línea (aceptadas
+ *  o enviadas), para contrastar el dimensionado de mercado con tus precios. */
+export function eurM2Historico(data: AppData, linea: LineaServicio): { eurM2: number; n: number } | null {
+  const conM2 = data.ofertas.filter(
+    (o) => o.lineaServicio === linea && (o.superficieM2 || 0) > 0 && o.importe > 0 && o.estado !== 'rechazada'
+  );
+  if (!conM2.length) return null;
+  const eurM2 = conM2.reduce((s, o) => s + o.importe / o.superficieM2!, 0) / conM2.length;
+  return { eurM2: r2(eurM2), n: conM2.length };
+}
+
 /** Propuesta inicial completa para una línea: horas por rol, gastos previstos y
  *  parámetros, mezclando tu histórico (si hay ≥ MIN_FACTURAS) con el mercado. */
 export function sugerirParametros(
@@ -245,23 +263,39 @@ export function sugerirParametros(
   linea: LineaServicio,
   importeObjetivo: number | undefined,
   complejidad: Complejidad,
-  benchmark?: BenchmarkLinea
+  benchmark?: BenchmarkLinea,
+  superficieM2?: number
 ): { params: ParametrosPresupuesto; baseReferencia: number; notas: string[] } {
   const pl = PLANTILLAS[linea] ?? PLANTILLAS['Otros'];
   const b = benchmark ?? benchmarksHistorico(data)[linea];
   const notas: string[] = [];
 
-  const baseReferencia =
-    importeObjetivo && importeObjetivo > 0
-      ? importeObjetivo
-      : b.nFacturas >= MIN_FACTURAS
-        ? b.ticketMedio
-        : 6000;
-  if (!importeObjetivo && b.nFacturas >= MIN_FACTURAS) {
-    notas.push(`Dimensionado sobre tu ticket medio en ${linea}: ${b.ticketMedio.toFixed(0)} € (${b.nFacturas} facturas).`);
+  // Con superficie, las horas salen de la curva de mercado h(m²); sin ella,
+  // del importe objetivo (o del ticket medio histórico) a tarifa media.
+  let totalHoras: number;
+  let baseReferencia: number;
+  if (superficieM2 && superficieM2 > 0) {
+    totalHoras = horasPorSuperficie(linea, superficieM2, complejidad);
+    baseReferencia = importeObjetivo && importeObjetivo > 0 ? importeObjetivo : r2(totalHoras * pl.eurPorHora);
+    notas.push(
+      `Dimensionado por superficie: ${superficieM2.toLocaleString('es-ES')} m² → ${totalHoras} h (curva de mercado con economía de escala${complejidad !== 'medio' ? `, complejidad ${complejidad}` : ''}).`
+    );
+    const hist = eurM2Historico(data, linea);
+    if (hist) {
+      notas.push(`Tu histórico en ${linea}: ${hist.eurM2.toFixed(2)} €/m² de media (${hist.n} ofertas con superficie).`);
+    }
+  } else {
+    baseReferencia =
+      importeObjetivo && importeObjetivo > 0
+        ? importeObjetivo
+        : b.nFacturas >= MIN_FACTURAS
+          ? b.ticketMedio
+          : 6000;
+    if (!importeObjetivo && b.nFacturas >= MIN_FACTURAS) {
+      notas.push(`Dimensionado sobre tu ticket medio en ${linea}: ${b.ticketMedio.toFixed(0)} € (${b.nFacturas} facturas).`);
+    }
+    totalHoras = r0((baseReferencia / pl.eurPorHora) * FACTOR_COMPLEJIDAD[complejidad]);
   }
-
-  const totalHoras = r0((baseReferencia / pl.eurPorHora) * FACTOR_COMPLEJIDAD[complejidad]);
   const equipo = equipoSugerido(linea, totalHoras);
   // Si el histórico dice cuánto pagas realmente por hora, ajusta el coste medio
   if (b.costeHoraReal) {
@@ -320,7 +354,8 @@ export function ajustarHorasAPrecio(p: ParametrosPresupuesto, precio: number): L
 /** Estimación persistible en la oferta + texto de desglose para las notas. */
 export function construirEstimacion(
   p: ParametrosPresupuesto,
-  importeOfertado: number
+  importeOfertado: number,
+  superficieM2?: number
 ): { estimacion: EstimacionOferta; resumen: string } {
   const r = calcularPresupuesto(p);
   const ev = evaluarPrecio(p, importeOfertado);
@@ -339,6 +374,9 @@ export function construirEstimacion(
   };
   const lineas = [
     `— Estimación (${p.linea}) —`,
+    ...(superficieM2 && superficieM2 > 0
+      ? [`Superficie: ${superficieM2.toLocaleString('es-ES')} m² → ${(importeOfertado / superficieM2).toFixed(2)} €/m²`]
+      : []),
     ...estimacion.equipo.map((e) => `· ${e.rol}: ${e.horas} h × ${e.costeHora.toFixed(2)} €/h = ${(e.horas * e.costeHora).toFixed(2)} €`),
     ...estimacion.gastos.map((g) => `· ${g.concepto}: ${g.base.toFixed(2)} €`),
     `Coste total: ${r.costeTotal.toFixed(2)} € (incluye ${p.contingenciaPct}% contingencia)`,

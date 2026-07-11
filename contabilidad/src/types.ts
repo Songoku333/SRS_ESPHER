@@ -59,6 +59,7 @@ export interface Oferta {
   estado: EstadoOferta;
   proyectoId?: string;
   notas?: string;
+  superficieM2?: number; // m² del activo: la variable de dimensionado del sector
   estimacion?: EstimacionOferta;
 }
 

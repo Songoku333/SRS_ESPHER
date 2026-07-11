@@ -23,6 +23,9 @@ export interface GastoPlantilla {
 export interface Plantilla {
   eurPorHora: number; // tarifa media efectiva para estimar las horas totales
   ticketMercado: [number, number]; // rango típico de honorarios en España (base €)
+  /** Curva de dimensionado por superficie: horas = max(horasMin, coef · m²^exp).
+   *  El exponente < 1 recoge la economía de escala del sector (a más m², menos h/m²). */
+  superficie: { coef: number; exp: number; horasMin: number };
   comercialPct: number;
   generalesPct: number;
   roles: RolPlantilla[];
@@ -33,6 +36,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Ingeniería MEP': {
     eurPorHora: 45,
     ticketMercado: [5000, 45000],
+    superficie: { coef: 0.7, exp: 0.75, horasMin: 40 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -51,6 +55,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   Legalizaciones: {
     eurPorHora: 42,
     ticketMercado: [1500, 8000],
+    superficie: { coef: 4, exp: 0.45, horasMin: 25 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -69,6 +74,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Auditoría energética': {
     eurPorHora: 48,
     ticketMercado: [2500, 12000],
+    superficie: { coef: 1.2, exp: 0.55, horasMin: 20 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -85,6 +91,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Modelado y simulación energética': {
     eurPorHora: 50,
     ticketMercado: [3000, 15000],
+    superficie: { coef: 1.4, exp: 0.55, horasMin: 24 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -100,6 +107,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Consultoría fondos inmobiliarios': {
     eurPorHora: 65,
     ticketMercado: [8000, 60000],
+    superficie: { coef: 1.8, exp: 0.5, horasMin: 30 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -115,6 +123,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Consultoría residencial': {
     eurPorHora: 55,
     ticketMercado: [4000, 25000],
+    superficie: { coef: 1.5, exp: 0.5, horasMin: 24 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -130,6 +139,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   'Clima y sostenibilidad': {
     eurPorHora: 55,
     ticketMercado: [5000, 30000],
+    superficie: { coef: 1.6, exp: 0.6, horasMin: 30 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -146,6 +156,7 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
   Otros: {
     eurPorHora: 45,
     ticketMercado: [2000, 15000],
+    superficie: { coef: 1.5, exp: 0.5, horasMin: 16 },
     comercialPct: 10,
     generalesPct: 20,
     roles: [
