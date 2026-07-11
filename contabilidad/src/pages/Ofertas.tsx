@@ -98,6 +98,7 @@ const Ofertas: React.FC = () => {
     titulo: string;
     linea: LineaServicio;
     importe: number;
+    superficieM2?: number;
     estimacion: { estimacion: NonNullable<Oferta['estimacion']>; resumen: string };
   }) => {
     const clienteId = ensureContacto(r.clienteNombre, 'cliente');
@@ -116,6 +117,7 @@ const Ofertas: React.FC = () => {
           fecha: hoy(),
           estado: 'borrador' as const,
           notas: r.estimacion.resumen,
+          superficieM2: r.superficieM2,
           estimacion: r.estimacion.estimacion,
         },
       ],
@@ -205,7 +207,14 @@ const Ofertas: React.FC = () => {
                 <td className="px-3 py-2 font-medium whitespace-nowrap">{o.codigo}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{fmtDate(o.fecha)}</td>
                 <td className="px-3 py-2">{nombreCliente(o.clienteId)}</td>
-                <td className="px-3 py-2">{o.titulo}</td>
+                <td className="px-3 py-2">
+                  {o.titulo}
+                  {(o.superficieM2 || 0) > 0 && (
+                    <span className="text-xs text-gray-400 ml-1 whitespace-nowrap">
+                      {o.superficieM2!.toLocaleString('es-ES')} m² · {(o.importe / o.superficieM2!).toFixed(2)} €/m²
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-gray-500 text-xs">{o.lineaServicio}</td>
                 <td className="px-3 py-2 font-medium whitespace-nowrap">
                   {fmtEur(o.importe)}

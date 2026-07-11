@@ -9,6 +9,7 @@ import {
   construirEstimacion,
   referenciaMercado,
   precioMercadoEquipo,
+  horasPorSuperficie,
   Complejidad,
   ParametrosPresupuesto,
   MIN_FACTURAS,
@@ -27,6 +28,7 @@ interface Props {
     titulo: string;
     linea: LineaServicio;
     importe: number;
+    superficieM2?: number;
     estimacion: ReturnType<typeof construirEstimacion>;
   }) => void;
   onClose: () => void;
@@ -41,6 +43,7 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
   const [titulo, setTitulo] = useState('');
   const [linea, setLinea] = useState<LineaServicio>('Ingeniería MEP');
   const [complejidad, setComplejidad] = useState<Complejidad>('medio');
+  const [superficie, setSuperficie] = useState('');
   const [precioObjetivo, setPrecioObjetivo] = useState('');
   const [params, setParams] = useState<ParametrosPresupuesto | null>(null);
   const [notas, setNotas] = useState<string[]>([]);
@@ -48,9 +51,11 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
   const b = benchmarks[linea];
   const mercado = referenciaMercado(linea);
 
+  const m2 = num(superficie);
+
   const generar = () => {
     const objetivo = num(precioObjetivo) || undefined;
-    const s = sugerirParametros(data, linea, objetivo, complejidad, b);
+    const s = sugerirParametros(data, linea, objetivo, complejidad, b, m2 > 0 ? m2 : undefined);
     setParams(s.params);
     setNotas(s.notas);
   };
@@ -97,7 +102,8 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
       titulo,
       linea,
       importe: importeFinal,
-      estimacion: construirEstimacion(params, importeFinal),
+      superficieM2: m2 > 0 ? m2 : undefined,
+      estimacion: construirEstimacion(params, importeFinal, m2 > 0 ? m2 : undefined),
     });
   };
 
@@ -131,7 +137,18 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
               <option value="complejo">Complejo (+30% horas y contingencia)</option>
             </select>
           </Field>
-          <Field label="Precio objetivo (€, opcional)" className="col-span-2">
+          <Field label="Superficie del activo (m²)">
+            <input
+              type="number"
+              step="10"
+              min="0"
+              className={inputCls}
+              value={superficie}
+              onChange={(e) => { setSuperficie(e.target.value); setParams(null); }}
+              placeholder="La variable clave del sector"
+            />
+          </Field>
+          <Field label="Precio objetivo (€, opcional)">
             <input type="number" step="100" className={inputCls} value={precioObjetivo} onChange={(e) => setPrecioObjetivo(e.target.value)} placeholder={b.ticketMedio > 0 ? `Tu ticket medio: ${b.ticketMedio.toFixed(0)} €` : 'Déjalo vacío para que lo proponga el asistente'} />
           </Field>
         </div>
@@ -160,6 +177,16 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
               <div><span className="text-xs text-violet-600 block">Venta media</span>{mercado.ventaMediaHora.toFixed(0)} €/h</div>
               <div><span className="text-xs text-violet-600 block">Coste colaborador medio</span>{mercado.costeMedioHora.toFixed(0)} €/h</div>
               <div className="col-span-2"><span className="text-xs text-violet-600 block">Ticket típico del trabajo</span>{fmtEur(mercado.ticketMercado[0])} – {fmtEur(mercado.ticketMercado[1])}</div>
+              {m2 > 0 && (() => {
+                const h = horasPorSuperficie(linea, m2, complejidad);
+                const precio = h * mercado.ventaMediaHora;
+                return (
+                  <div className="col-span-2">
+                    <span className="text-xs text-violet-600 block">Para {m2.toLocaleString('es-ES')} m²</span>
+                    ≈ {h} h · {fmtEur(precio)} ({(precio / m2).toFixed(2)} €/m²)
+                  </div>
+                );
+              })()}
             </div>
             <p className="text-xs text-violet-700 mt-1">Medias orientativas del sector en España (honorarios liberalizados); editables por rol en la tabla.</p>
           </div>
@@ -286,7 +313,13 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
                 <div><span className="text-xs text-gray-500 block">Coste total</span><span className="font-medium">{fmtEur(resultado!.costeTotal)}</span></div>
                 <div><span className="text-xs text-gray-500 block">Precio mínimo viable</span><span className="font-medium">{fmtEur(resultado!.precioMinimo)}</span></div>
                 <div><span className="text-xs text-gray-500 block">Precio recomendado</span><span className="font-semibold text-teal-700">{fmtEur(resultado!.precioRecomendado)}</span></div>
-                <div><span className="text-xs text-gray-500 block">Tarifa efectiva</span><span className="font-medium">{resultado!.tarifaEfectiva > 0 ? `${resultado!.tarifaEfectiva.toFixed(0)} €/h` : '—'}</span></div>
+                <div>
+                  <span className="text-xs text-gray-500 block">{m2 > 0 ? 'Tarifa efectiva · €/m²' : 'Tarifa efectiva'}</span>
+                  <span className="font-medium">
+                    {resultado!.tarifaEfectiva > 0 ? `${resultado!.tarifaEfectiva.toFixed(0)} €/h` : '—'}
+                    {m2 > 0 && importeFinal > 0 ? ` · ${(importeFinal / m2).toFixed(2)} €/m²` : ''}
+                  </span>
+                </div>
               </div>
               {(() => {
                 const pm = precioMercadoEquipo(params.equipo) + resultado!.gastosDirectos;
