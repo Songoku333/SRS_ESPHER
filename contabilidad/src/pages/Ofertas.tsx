@@ -106,7 +106,30 @@ const Ofertas: React.FC = () => {
           html: generarDocumentoOferta(o, cliente),
         },
       });
-      if (error) throw new Error(error.message || 'Error llamando a la función subir-oferta');
+      if (error) {
+        // Recuperar el cuerpo real de la respuesta para saber la causa exacta
+        let detalle = error.message || 'Error llamando a la función subir-oferta';
+        const ctx = (error as { context?: Response }).context;
+        if (ctx) {
+          if (ctx.status === 404) {
+            detalle = 'La función "subir-oferta" no está desplegada en Supabase (404). Despliégala en Edge Functions.';
+          } else {
+            try {
+              const cuerpo = await ctx.text();
+              if (cuerpo) {
+                try {
+                  detalle = `HTTP ${ctx.status}: ${JSON.parse(cuerpo).error || cuerpo}`;
+                } catch {
+                  detalle = `HTTP ${ctx.status}: ${cuerpo.slice(0, 400)}`;
+                }
+              }
+            } catch {
+              // sin cuerpo legible: dejamos el mensaje genérico
+            }
+          }
+        }
+        throw new Error(detalle);
+      }
       if (res?.error) throw new Error(res.error);
       alert(`Oferta archivada en SharePoint: ${res.carpeta}/${res.nombre}`);
     } catch (e) {
