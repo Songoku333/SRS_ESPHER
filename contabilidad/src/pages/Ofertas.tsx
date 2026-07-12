@@ -5,6 +5,8 @@ import { Oferta, EstadoOferta, LineaServicio, LINEAS_SERVICIO } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
 import AsistenteOferta from '../components/AsistenteOferta';
+import { abrirDocumentoOferta, generarDocumentoOferta } from '../lib/ofertaDoc';
+import { getClient } from '../lib/supabase';
 
 const ESTADOS: EstadoOferta[] = ['borrador', 'enviada', 'aceptada', 'rechazada'];
 
@@ -84,6 +86,34 @@ const Ofertas: React.FC = () => {
       setState((p) => ({ ...p, ofertas: [...p.ofertas, { id: uid(), ...base }] }));
     }
     setAbierto(false);
+  };
+
+  const [subiendo, setSubiendo] = useState<string | null>(null);
+
+  /** Genera el documento y lo archiva en la carpeta de ofertas de SharePoint. */
+  const subirASharePoint = async (o: Oferta) => {
+    const client = getClient();
+    if (!client) {
+      alert('Configura la nube (Supabase) en Ajustes para poder archivar en SharePoint.');
+      return;
+    }
+    setSubiendo(o.id);
+    try {
+      const cliente = data.contactos.find((c) => c.id === o.clienteId);
+      const { data: res, error } = await client.functions.invoke('subir-oferta', {
+        body: {
+          nombre: `${o.codigo} - ${o.titulo}`,
+          html: generarDocumentoOferta(o, cliente),
+        },
+      });
+      if (error) throw new Error(error.message || 'Error llamando a la función subir-oferta');
+      if (res?.error) throw new Error(res.error);
+      alert(`Oferta archivada en SharePoint: ${res.carpeta}/${res.nombre}`);
+    } catch (e) {
+      alert(`No se pudo archivar en SharePoint: ${(e as Error).message}\n\n¿Está desplegada la función "subir-oferta" y el permiso Sites.ReadWrite.All concedido?`);
+    } finally {
+      setSubiendo(null);
+    }
   };
 
   const borrar = (o: Oferta) => {
@@ -238,6 +268,12 @@ const Ofertas: React.FC = () => {
                   <Badge color={badgeEstado[o.estado]}>{o.estado}</Badge>
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <Btn variant="ghost" title="Ver / imprimir el documento de oferta" onClick={() => abrirDocumentoOferta(o, data.contactos.find((c) => c.id === o.clienteId))}>
+                    📄
+                  </Btn>
+                  <Btn variant="ghost" title="Archivar el documento en SharePoint" onClick={() => subirASharePoint(o)} disabled={subiendo === o.id}>
+                    {subiendo === o.id ? '…' : '☁'}
+                  </Btn>
                   {!o.proyectoId && o.estado !== 'rechazada' && (
                     <Btn variant="ghost" onClick={() => convertirEnProyecto(o)}>
                       → Proyecto
