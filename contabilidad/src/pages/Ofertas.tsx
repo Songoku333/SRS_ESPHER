@@ -226,6 +226,13 @@ const Ofertas: React.FC = () => {
                       {(o.estimacion.margenPrevisto * 100).toFixed(0)}%
                     </span>
                   )}
+                  {o.estimacion?.sostenibilidad && (
+                    <span
+                      title={`Módulo sostenibilidad: ${o.estimacion.sostenibilidad.nivel} · EasyESG.pro ${o.estimacion.sostenibilidad.saasAnual.toFixed(0)} €/año`}
+                    >
+                      {' '}🌱
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <Badge color={badgeEstado[o.estado]}>{o.estado}</Badge>
