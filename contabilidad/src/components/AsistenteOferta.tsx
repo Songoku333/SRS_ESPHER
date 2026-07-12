@@ -10,10 +10,19 @@ import {
   referenciaMercado,
   precioMercadoEquipo,
   horasPorSuperficie,
+  desglosarDisciplinas,
   Complejidad,
   ParametrosPresupuesto,
   MIN_FACTURAS,
 } from '../lib/estimador';
+import {
+  NIVELES,
+  ESTANDARES_REPORTE,
+  calcularModuloSostenibilidad,
+  NivelSostenibilidad,
+  EstandarId,
+} from '../lib/sostenibilidad';
+import { PLANTILLAS } from '../lib/plantillas';
 import { fmtEur } from '../lib/format';
 import { Btn, Modal, Field, inputCls } from './ui';
 
@@ -47,6 +56,10 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
   const [precioObjetivo, setPrecioObjetivo] = useState('');
   const [params, setParams] = useState<ParametrosPresupuesto | null>(null);
   const [notas, setNotas] = useState<string[]>([]);
+  const [pesos, setPesos] = useState<{ nombre: string; peso: number }[]>([]);
+  const [sostActivo, setSostActivo] = useState(false);
+  const [sostNivel, setSostNivel] = useState<NivelSostenibilidad>('avanzado');
+  const [sostEstandares, setSostEstandares] = useState<EstandarId[]>([]);
 
   const b = benchmarks[linea];
   const mercado = referenciaMercado(linea);
@@ -58,13 +71,27 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
     const s = sugerirParametros(data, linea, objetivo, complejidad, b, m2 > 0 ? m2 : undefined);
     setParams(s.params);
     setNotas(s.notas);
+    setPesos((PLANTILLAS[linea] ?? PLANTILLAS['Otros']).disciplinas?.map((d) => ({ ...d })) ?? []);
   };
 
-  const resultado = params ? calcularPresupuesto(params) : null;
+  // Módulo de sostenibilidad: sus horas y hardware se suman a la oferta
+  const modulo = sostActivo ? calcularModuloSostenibilidad(m2, sostNivel, sostEstandares) : null;
+  const paramsEf: ParametrosPresupuesto | null = params
+    ? modulo
+      ? { ...params, equipo: [...params.equipo, ...modulo.equipo], gastos: [...params.gastos, ...modulo.gastos] }
+      : params
+    : null;
+
+  const resultado = paramsEf ? calcularPresupuesto(paramsEf) : null;
   const objetivo = num(precioObjetivo);
-  const evalObjetivo = params && objetivo > 0 ? evaluarPrecio(params, objetivo) : null;
+  const evalObjetivo = paramsEf && objetivo > 0 ? evaluarPrecio(paramsEf, objetivo) : null;
   const importeFinal = objetivo > 0 ? objetivo : (resultado?.precioRecomendado ?? 0);
-  const evalFinal = params && importeFinal > 0 ? evaluarPrecio(params, importeFinal) : null;
+  const evalFinal = paramsEf && importeFinal > 0 ? evaluarPrecio(paramsEf, importeFinal) : null;
+
+  // Desglose técnico por disciplina de las horas base (sin el módulo)
+  const base = params ? calcularPresupuesto(params) : null;
+  const disciplinas =
+    params && base && pesos.length > 0 ? desglosarDisciplinas(pesos, base.totalHoras, base.costeEquipo) : [];
 
   const semaforo = (m: number) =>
     m >= 0.1495 ? 'text-green-700 bg-green-50 border-green-200' : m >= 0.05 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-700 bg-red-50 border-red-200';
@@ -96,14 +123,26 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
   };
 
   const crear = () => {
-    if (!params || !evalFinal) return;
+    if (!paramsEf || !evalFinal) return;
     onCrear({
       clienteNombre,
       titulo,
       linea,
       importe: importeFinal,
       superficieM2: m2 > 0 ? m2 : undefined,
-      estimacion: construirEstimacion(params, importeFinal, m2 > 0 ? m2 : undefined),
+      estimacion: construirEstimacion(paramsEf, importeFinal, {
+        superficieM2: m2 > 0 ? m2 : undefined,
+        disciplinas,
+        sostenibilidad: modulo
+          ? {
+              nivel: NIVELES[sostNivel].etiqueta,
+              estandares: [...sostEstandares],
+              horas: modulo.horas,
+              hardware: modulo.hardware,
+              saasAnual: modulo.saasAnual,
+            }
+          : undefined,
+      }),
     });
   };
 
@@ -210,7 +249,7 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
             <div>
               <div className="flex items-center justify-between mb-1">
                 <h3 className="font-medium text-sm">👥 Recursos: horas de colaborador por rol</h3>
-                {objetivo > 0 && (
+                {objetivo > 0 && !sostActivo && (
                   <Btn variant="ghost" onClick={ajustarAlObjetivo}>⚖ Ajustar horas al precio objetivo</Btn>
                 )}
               </div>
@@ -239,15 +278,59 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
                     </tr>
                   ))}
                   <tr className="font-medium">
-                    <td className="py-1">Total equipo</td>
-                    <td>{resultado!.totalHoras} h</td>
+                    <td className="py-1">Total equipo{sostActivo ? ' (sin módulo 🌱)' : ''}</td>
+                    <td>{base!.totalHoras} h</td>
                     <td></td>
                     <td></td>
-                    <td className="text-right">{fmtEur(resultado!.costeEquipo)}</td>
+                    <td className="text-right">{fmtEur(base!.costeEquipo)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+
+            {/* Desglose técnico por actividad/disciplina */}
+            {disciplinas.length > 0 && (
+              <div>
+                <h3 className="font-medium text-sm mb-1">⚡ Desglose por actividad / disciplina</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b">
+                      <th className="py-1">Disciplina</th>
+                      <th className="py-1 w-24">Peso %</th>
+                      <th className="py-1 w-24 text-right">Horas</th>
+                      <th className="py-1 w-28 text-right">Coste</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pesos.map((d, i) => {
+                      const desglose = disciplinas.find((x) => x.nombre === d.nombre);
+                      return (
+                        <tr key={d.nombre} className="border-b border-gray-100">
+                          <td className="py-1">{d.nombre}</td>
+                          <td>
+                            <input
+                              type="number"
+                              step="1"
+                              min="0"
+                              className={`${inputCls} py-1`}
+                              value={d.peso}
+                              onChange={(ev) =>
+                                setPesos(pesos.map((x, j) => (j === i ? { ...x, peso: num(ev.target.value) } : x)))
+                              }
+                            />
+                          </td>
+                          <td className="text-right">{desglose ? `${desglose.horas} h` : '—'}</td>
+                          <td className="text-right whitespace-nowrap">{desglose ? fmtEur(desglose.coste) : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-xs text-gray-400 mt-1">
+                  Reparto de las {base!.totalHoras} h técnicas según el peso de cada disciplina (los pesos se normalizan si no suman 100).
+                </p>
+              </div>
+            )}
 
             {/* Gastos directos */}
             <div>
@@ -291,6 +374,80 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
               </table>
             </div>
 
+            {/* Módulo opcional: sostenibilidad inteligente */}
+            <div className={`rounded-lg border p-3 ${sostActivo ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-gray-50'}`}>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" className="mt-1" checked={sostActivo} onChange={(e) => setSostActivo(e.target.checked)} />
+                <span>
+                  <span className="font-medium text-sm">🌱 Módulo de sostenibilidad inteligente (opcional)</span>
+                  <span className="block text-xs text-gray-500">
+                    Inmótica y sensórica conectadas al BMS: eficiencia, CO₂, calidad de aire y confort, con KPIs reportables
+                    vía <span className="font-medium">EasyESG.pro</span>. Se puede ofertar solo o como extra de cualquier línea.
+                  </span>
+                </span>
+              </label>
+              {sostActivo && modulo && (
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <Field label="Alcance">
+                      <select className={inputCls} value={sostNivel} onChange={(e) => setSostNivel(e.target.value as NivelSostenibilidad)}>
+                        {(Object.keys(NIVELES) as NivelSostenibilidad[]).map((n) => (
+                          <option key={n} value={n}>{NIVELES[n].etiqueta}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">{NIVELES[sostNivel].descripcion}</p>
+                    </Field>
+                    <Field label="Marcos de reporte (setup incluido)">
+                      <div className="space-y-1">
+                        {ESTANDARES_REPORTE.map((e) => (
+                          <label key={e.id} className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={sostEstandares.includes(e.id)}
+                              onChange={(ev) =>
+                                setSostEstandares(
+                                  ev.target.checked ? [...sostEstandares, e.id] : sostEstandares.filter((x) => x !== e.id)
+                                )
+                              }
+                            />
+                            {e.nombre} <span className="text-gray-400">+{e.horasSetup} h</span>
+                          </label>
+                        ))}
+                      </div>
+                    </Field>
+                  </div>
+                  <div className="rounded border border-emerald-200 bg-white p-2">
+                    {modulo.equipo.map((e) => (
+                      <div key={e.rol} className="flex justify-between text-xs py-0.5">
+                        <span>{e.rol}</span>
+                        <span className="whitespace-nowrap">{e.horas} h × {e.costeHora} €/h = {fmtEur(e.horas * e.costeHora)}</span>
+                      </div>
+                    ))}
+                    {modulo.gastos.map((g) => (
+                      <div key={g.concepto} className="flex justify-between text-xs py-0.5 text-gray-600">
+                        <span>{g.concepto}</span>
+                        <span className="whitespace-nowrap">{fmtEur(g.base)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-xs pt-1 mt-1 border-t border-emerald-100 font-medium">
+                      <span>Módulo: {modulo.horas} h de servicio + hardware</span>
+                      <span>{fmtEur(modulo.horas ? modulo.equipo.reduce((s, e) => s + e.horas * e.costeHora, 0) + modulo.hardware : modulo.hardware)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs py-0.5 text-emerald-700 font-medium">
+                      <span>Suscripción EasyESG.pro (recurrente, se factura aparte)</span>
+                      <span>{fmtEur(modulo.saasAnual)}/año</span>
+                    </div>
+                  </div>
+                  {modulo.notas.map((n, i) => (
+                    <p key={i} className="text-xs text-emerald-800">{n}</p>
+                  ))}
+                  {m2 <= 0 && (
+                    <p className="text-xs text-amber-700">⚠ Sin superficie, el módulo se dimensiona para un activo tipo de 1.000 m²: introduce los m² arriba para afinarlo.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Parámetros */}
             <div className="grid grid-cols-4 gap-3">
               <Field label="Contingencia %">
@@ -321,8 +478,14 @@ const AsistenteOferta: React.FC<Props> = ({ data, clientes, onCrear, onClose }) 
                   </span>
                 </div>
               </div>
+              {sostActivo && modulo && (
+                <p className="text-xs text-emerald-700">
+                  🌱 Incluye el módulo de sostenibilidad ({modulo.horas} h + {fmtEur(modulo.hardware)} de sensórica/BMS) ·
+                  suscripción EasyESG.pro de {fmtEur(modulo.saasAnual)}/año aparte.
+                </p>
+              )}
               {(() => {
-                const pm = precioMercadoEquipo(params.equipo) + resultado!.gastosDirectos;
+                const pm = precioMercadoEquipo(paramsEf!.equipo) + resultado!.gastosDirectos;
                 if (pm <= 0 || importeFinal <= 0) return null;
                 const dif = (importeFinal - pm) / pm;
                 return (

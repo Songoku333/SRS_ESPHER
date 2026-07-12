@@ -351,17 +351,48 @@ export function ajustarHorasAPrecio(p: ParametrosPresupuesto, precio: number): L
   return p.equipo.map((e) => ({ ...e, horas: Math.max(0, Math.round(e.horas * factor * 2) / 2) }));
 }
 
+/** Desglose técnico por actividad/disciplina de las horas de ingeniería. */
+export interface DisciplinaDesglose {
+  nombre: string;
+  horas: number;
+  coste: number;
+}
+
+/** Reparte las horas y el coste del equipo entre disciplinas según sus pesos (%). */
+export function desglosarDisciplinas(
+  pesos: { nombre: string; peso: number }[],
+  totalHoras: number,
+  costeEquipo: number
+): DisciplinaDesglose[] {
+  const suma = pesos.reduce((s, d) => s + d.peso, 0);
+  if (suma <= 0) return [];
+  return pesos
+    .filter((d) => d.peso > 0)
+    .map((d) => ({
+      nombre: d.nombre,
+      horas: Math.round(((totalHoras * d.peso) / suma) * 2) / 2,
+      coste: r2((costeEquipo * d.peso) / suma),
+    }));
+}
+
 /** Estimación persistible en la oferta + texto de desglose para las notas. */
 export function construirEstimacion(
   p: ParametrosPresupuesto,
   importeOfertado: number,
-  superficieM2?: number
+  extras?: {
+    superficieM2?: number;
+    disciplinas?: DisciplinaDesglose[];
+    sostenibilidad?: NonNullable<EstimacionOferta['sostenibilidad']>;
+  }
 ): { estimacion: EstimacionOferta; resumen: string } {
   const r = calcularPresupuesto(p);
   const ev = evaluarPrecio(p, importeOfertado);
+  const superficieM2 = extras?.superficieM2;
   const estimacion: EstimacionOferta = {
     equipo: p.equipo.filter((e) => e.horas > 0),
     gastos: p.gastos.filter((g) => g.base > 0),
+    disciplinas: extras?.disciplinas?.length ? extras.disciplinas : undefined,
+    sostenibilidad: extras?.sostenibilidad,
     contingenciaPct: p.contingenciaPct,
     comercialPct: p.comercialPct,
     generalesPct: p.generalesPct,
@@ -372,6 +403,7 @@ export function construirEstimacion(
     precioRecomendado: r.precioRecomendado,
     margenPrevisto: ev.margen,
   };
+  const s = extras?.sostenibilidad;
   const lineas = [
     `— Estimación (${p.linea}) —`,
     ...(superficieM2 && superficieM2 > 0
@@ -379,6 +411,18 @@ export function construirEstimacion(
       : []),
     ...estimacion.equipo.map((e) => `· ${e.rol}: ${e.horas} h × ${e.costeHora.toFixed(2)} €/h = ${(e.horas * e.costeHora).toFixed(2)} €`),
     ...estimacion.gastos.map((g) => `· ${g.concepto}: ${g.base.toFixed(2)} €`),
+    ...(estimacion.disciplinas?.length
+      ? [
+          'Desglose por disciplina:',
+          ...estimacion.disciplinas.map((d) => `  – ${d.nombre}: ${d.horas} h · ${d.coste.toFixed(2)} €`),
+        ]
+      : []),
+    ...(s
+      ? [
+          `Módulo sostenibilidad inteligente (${s.nivel}${s.estandares.length ? ` · ${s.estandares.join(', ')}` : ''}): ${s.horas} h de servicio + ${s.hardware.toFixed(2)} € de sensórica/BMS.`,
+          `Suscripción EasyESG.pro: ${s.saasAnual.toFixed(2)} €/año (recurrente, se factura aparte).`,
+        ]
+      : []),
     `Coste total: ${r.costeTotal.toFixed(2)} € (incluye ${p.contingenciaPct}% contingencia)`,
     `Comercial ${p.comercialPct}% · Generales ${p.generalesPct}% · Margen previsto: ${(ev.margen * 100).toFixed(1)}%`,
     `Precio recomendado: ${r.precioRecomendado.toFixed(2)} € · mínimo viable: ${r.precioMinimo.toFixed(2)} €`,

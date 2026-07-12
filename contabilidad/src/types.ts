@@ -37,6 +37,16 @@ export type EstadoOferta = 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
 export interface EstimacionOferta {
   equipo: { rol: string; horas: number; costeHora: number; ventaHora?: number }[];
   gastos: { concepto: string; categoria: CategoriaGasto; base: number }[];
+  /** Desglose técnico por actividad/disciplina (líneas de ingeniería) */
+  disciplinas?: { nombre: string; horas: number; coste: number }[];
+  /** Módulo opcional de sostenibilidad inteligente (inmótica + reporting ESG) */
+  sostenibilidad?: {
+    nivel: string;
+    estandares: string[];
+    horas: number;
+    hardware: number;
+    saasAnual: number; // suscripción EasyESG.pro, recurrente
+  };
   contingenciaPct: number;
   comercialPct: number;
   generalesPct: number;

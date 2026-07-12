@@ -20,8 +20,15 @@ export interface GastoPlantilla {
   valor: number;
 }
 
+export interface DisciplinaPlantilla {
+  nombre: string;
+  peso: number; // % de las horas técnicas del trabajo
+}
+
 export interface Plantilla {
   eurPorHora: number; // tarifa media efectiva para estimar las horas totales
+  /** Desglose técnico típico por actividad/disciplina (solo líneas de ingeniería) */
+  disciplinas?: DisciplinaPlantilla[];
   ticketMercado: [number, number]; // rango típico de honorarios en España (base €)
   /** Curva de dimensionado por superficie: horas = max(horasMin, coef · m²^exp).
    *  El exponente < 1 recoge la economía de escala del sector (a más m², menos h/m²). */
@@ -37,6 +44,15 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     eurPorHora: 45,
     ticketMercado: [5000, 45000],
     superficie: { coef: 0.7, exp: 0.75, horasMin: 40 },
+    disciplinas: [
+      { nombre: 'Climatización / HVAC', peso: 28 },
+      { nombre: 'Electricidad', peso: 24 },
+      { nombre: 'PCI (protección contra incendios)', peso: 14 },
+      { nombre: 'Fontanería y saneamiento', peso: 12 },
+      { nombre: 'Telecomunicaciones / ICT', peso: 8 },
+      { nombre: 'Gas y combustibles', peso: 5 },
+      { nombre: 'Coordinación y proyecto', peso: 9 },
+    ],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
@@ -56,6 +72,14 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
     eurPorHora: 42,
     ticketMercado: [1500, 8000],
     superficie: { coef: 4, exp: 0.45, horasMin: 25 },
+    disciplinas: [
+      { nombre: 'Electricidad (BT/AT)', peso: 34 },
+      { nombre: 'Climatización / RITE', peso: 20 },
+      { nombre: 'PCI (protección contra incendios)', peso: 18 },
+      { nombre: 'Gas y combustibles', peso: 10 },
+      { nombre: 'Telecomunicaciones / ICT', peso: 6 },
+      { nombre: 'Tramitación y coordinación', peso: 12 },
+    ],
     comercialPct: 10,
     generalesPct: 20,
     roles: [
