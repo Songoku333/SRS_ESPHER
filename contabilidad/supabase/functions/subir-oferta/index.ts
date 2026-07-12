@@ -5,8 +5,10 @@
 // Graph, con las mismas credenciales que la ingesta).
 //
 // Despliegue: Edge Functions → Deploy new function → nombre
-// "subir-oferta" → pegar este fichero → dejar "Verify JWT" ACTIVADO
-// (solo usuarios con sesión de la app pueden llamarla).
+// "subir-oferta" → pegar este fichero → "Verify JWT" DESACTIVADO
+// (los proyectos con claves nuevas sb_publishable_* no pasan ese
+// verificador de puerta; la sesión se valida AQUÍ DENTRO llamando
+// a /auth/v1/user, así solo usuarios logueados pueden subir).
 // Secrets (compartidos con la ingesta):
 //   MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, SP_SITE
 //   SP_BIBLIOTECA        (opcional) biblioteca de documentos
@@ -24,6 +26,31 @@ const CORS = {
 };
 
 const env = (k: string) => (Deno.env.get(k) || '').trim();
+
+/** Valida la sesión del usuario contra el Auth de Supabase (funciona tanto
+ *  con las claves antiguas como con las nuevas sb_publishable_*). */
+async function usuarioValido(req: Request): Promise<boolean> {
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return false;
+  const candidatas = [
+    env('SUPABASE_SERVICE_ROLE_KEY'),
+    env('SUPABASE_ANON_KEY'),
+    env('SUPABASE_PUBLISHABLE_KEY'),
+    req.headers.get('apikey') || '',
+  ].filter(Boolean);
+  for (const apikey of candidatas) {
+    try {
+      const res = await fetch(`${env('SUPABASE_URL')}/auth/v1/user`, {
+        headers: { apikey, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) return true;
+      if (res.status === 401 || res.status === 403) continue;
+    } catch {
+      // probar con la siguiente clave
+    }
+  }
+  return false;
+}
 
 async function tokenGraph(): Promise<string> {
   const res = await fetch(`https://login.microsoftonline.com/${env('MS_TENANT_ID')}/oauth2/v2.0/token`, {
@@ -74,6 +101,9 @@ Deno.serve(async (req: Request) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
   try {
+    if (!(await usuarioValido(req))) {
+      return json({ error: 'No autorizado: inicia sesión en la app para archivar ofertas.' }, 401);
+    }
     const { nombre, html } = await req.json();
     if (!nombre || !html) return json({ error: 'Faltan "nombre" o "html".' }, 400);
     if (String(html).length > 3_000_000) return json({ error: 'Documento demasiado grande.' }, 413);
