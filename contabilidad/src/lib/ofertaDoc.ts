@@ -86,6 +86,18 @@ export function capitulosPresupuesto(oferta: Oferta): CapituloPresupuesto[] {
 /** Exclusiones estándar de la casa (de los modelos de oferta SmartRem). */
 function exclusiones(oferta: Oferta): string[] {
   const conModulo = !!oferta.estimacion?.sostenibilidad;
+  if (oferta.lineaServicio === 'Pre-assessment BREEAM') {
+    return [
+      'No está incluido el I.V.A. (21 %).',
+      'Registro del proyecto y tasas de certificación de BREEAM ES / BRE (orientativamente entre 2.200 € y 13.800 € según superficie), que se abonan directamente a la entidad certificadora.',
+      'El assessment formal de certificación (fase de diseño y post-construcción) y la recopilación y presentación de evidencias, que serían objeto de oferta independiente.',
+      'Modelización energética completa (SBEM/HULC/simulación dinámica), estudios de iluminación natural, acústicos, de viabilidad LZC y ecológicos de detalle (se valorarían aparte si el objetivo de rating los requiere).',
+      'Modificaciones del proyecto o del diseño derivadas de las recomendaciones del informe.',
+      'La modificación, por causas ajenas a SmartRem, de la documentación de proyecto facilitada.',
+      'No se facilitará documentación ni planos en formato impreso.',
+      'Todo lo no incluido expresamente en la propuesta.',
+    ];
+  }
   return [
     'No está incluido el I.V.A. (21 %).',
     // Con el módulo de sostenibilidad, la monitorización IAQ/BMS SÍ está incluida
@@ -141,10 +153,24 @@ export function generarDocumentoOferta(oferta: Oferta, cliente: Contacto | undef
     .map((e) => `<li>${esc(e.rol.replace('🌱 ', ''))} <span class="nota">(dedicación estimada: ${e.horas} h)</span></li>`)
     .join('');
 
-  const alcance = est?.disciplinas?.length
-    ? `<p>Se trata del desarrollo de servicios de ${tipoTrabajos.toLowerCase()} de <b>${esc(oferta.lineaServicio)}</b> con las siguientes actividades y disciplinas:</p>
+  const esBreeam = oferta.lineaServicio === 'Pre-assessment BREEAM';
+  const alcance = esBreeam
+    ? `<p>Preevaluación (<i>pre-assessment</i>) <b>BREEAM®</b> del activo: análisis crédito a crédito del esquema aplicable para estimar la puntuación alcanzable y definir la hoja de ruta hacia la certificación, con el siguiente alcance:</p>
+  <ul>
+    <li>Revisión de la documentación de proyecto/activo y visita al inmueble.</li>
+    <li>Evaluación preliminar de los créditos por categoría, con la dedicación estimada siguiente:</li>
+  </ul>
+  ${est?.disciplinas?.length ? `<table><tr><th>Categoría BREEAM</th><th class="num">Dedicación</th></tr>${est.disciplinas.map((d) => `<tr><td>${esc(d.nombre)}</td><td class="num">${d.horas} h</td></tr>`).join('')}</table>` : ''}
+  <ul>
+    <li>Puntuación estimada y <b>rating alcanzable</b> (Pass ≥ 30 % · Good ≥ 45 % · Very Good ≥ 55 % · Excellent ≥ 70 % · Outstanding ≥ 85 %), en escenario base y escenario mejorado.</li>
+    <li>Análisis coste-beneficio de los créditos: qué medidas aportan más puntos por euro invertido.</li>
+    <li><i>Workshop</i> de presentación de resultados con la propiedad y el equipo de diseño.</li>
+    <li>Informe de preevaluación con la hoja de ruta recomendada hacia el rating objetivo.</li>
+  </ul>`
+    : est?.disciplinas?.length
+      ? `<p>Se trata del desarrollo de servicios de ${tipoTrabajos.toLowerCase()} de <b>${esc(oferta.lineaServicio)}</b> con las siguientes actividades y disciplinas:</p>
        <ul>${est.disciplinas.map((d) => `<li>${esc(d.nombre)} <span class="nota">(dedicación estimada: ${d.horas} h)</span></li>`).join('')}</ul>`
-    : `<p>Se trata del desarrollo de servicios de <b>${esc(oferta.lineaServicio)}</b>: ${esc(oferta.titulo)}.</p>`;
+      : `<p>Se trata del desarrollo de servicios de <b>${esc(oferta.lineaServicio)}</b>: ${esc(oferta.titulo)}.</p>`;
 
   let n = 0;
   const cap = () => ++n;
@@ -265,10 +291,18 @@ export function generarDocumentoOferta(oferta: Oferta, cliente: Contacto | undef
   </ul>
 
   <h2><span class="n">${cap()}.</span>Condiciones particulares</h2>
-  <ul>
+  ${
+    esBreeam
+      ? `<ul>
+    <li>La puntuación y el rating del pre-assessment son <b>orientativos y no vinculantes</b>: el resultado definitivo depende del assessment formal, de las evidencias aportadas y de la verificación del organismo certificador (BREEAM ES / BRE).</li>
+    <li>Se incluye una (1) iteración de re-puntuación tras el workshop de resultados, para reflejar las decisiones adoptadas por el equipo de diseño. Iteraciones adicionales serán objeto de oferta independiente.</li>
+    <li>La fiabilidad de la preevaluación depende de la calidad y completitud de la documentación facilitada por la propiedad y el equipo de proyecto.</li>
+  </ul>`
+      : `<ul>
     <li>Se incluye la modificación de aquellas partes del trabajo (correspondientes al ámbito de esta oferta) que deban corregirse por un requerimiento emitido por un organismo (Ayuntamiento e Industria). No así las modificaciones de terceros, que serán objeto de oferta independiente.</li>
     <li>Cualquier incumplimiento normativo de la arquitectura proyectada no detectado en la comprobación inicial será responsabilidad del técnico autor del proyecto arquitectónico. SmartRem no acometerá la rectificación de planos arquitectónicos.</li>
-  </ul>
+  </ul>`
+  }
 
   <h2><span class="n">${cap()}.</span>Presupuesto y condiciones económicas</h2>
   <p>Los honorarios a percibir por SmartRem, correspondientes a los servicios prestados, serán los siguientes:</p>

@@ -177,6 +177,37 @@ export const PLANTILLAS: Record<LineaServicio, Plantilla> = {
       { concepto: 'Desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.0 },
     ],
   },
+  'Pre-assessment BREEAM': {
+    // Mercado España: preevaluación aislada 2.000–4.000 € en proyecto estándar,
+    // hasta ~9.000 € en activos grandes (1–2 semanas, 40–80 h). Las tasas de
+    // registro/certificación BREEAM ES van aparte (2.200–13.800 € según m²).
+    eurPorHora: 58,
+    ticketMercado: [2500, 9000],
+    superficie: { coef: 1.0, exp: 0.5, horasMin: 32 },
+    disciplinas: [
+      { nombre: 'Gestión (Man)', peso: 12 },
+      { nombre: 'Salud y bienestar (Hea)', peso: 15 },
+      { nombre: 'Energía (Ene)', peso: 24 },
+      { nombre: 'Transporte (Tra)', peso: 8 },
+      { nombre: 'Agua (Wat)', peso: 6 },
+      { nombre: 'Materiales (Mat)', peso: 12 },
+      { nombre: 'Residuos (Wst)', peso: 6 },
+      { nombre: 'Uso del suelo y ecología (LE)', peso: 8 },
+      { nombre: 'Contaminación (Pol)', peso: 9 },
+    ],
+    comercialPct: 10,
+    generalesPct: 20,
+    roles: [
+      { nombre: 'Asesor BREEAM (evaluación y puntuación)', pesoHoras: 40, costeHora: 50, ventaHora: 85 },
+      { nombre: 'Ingeniero de instalaciones (energía y agua)', pesoHoras: 25, costeHora: 35, ventaHora: 55 },
+      { nombre: 'Consultor de sostenibilidad', pesoHoras: 20, costeHora: 45, ventaHora: 75 },
+      { nombre: 'Técnico de documentación', pesoHoras: 15, costeHora: 25, ventaHora: 40 },
+    ],
+    gastos: [
+      { concepto: 'Visita al activo y desplazamientos', categoria: 'Desplazamientos y dietas', modo: 'pct', valor: 2.5 },
+      { concepto: 'Maquetación del informe de preevaluación', categoria: 'Suministros y oficina', modo: 'fijo', valor: 150 },
+    ],
+  },
   Otros: {
     eurPorHora: 45,
     ticketMercado: [2000, 15000],
@@ -250,6 +281,7 @@ export function adivinarLinea(texto: string): LineaServicio {
   if (has('simulacion', 'modelado', 'hulc', 'calener', 'designbuilder', 'ida ice')) return 'Modelado y simulación energética';
   if (has('fondo', 'due diligence', 'inversion', 'socimi', 'cartera', 'activos')) return 'Consultoría fondos inmobiliarios';
   if (has('residencia', 'residencial', 'senior living', 'flex living', 'coliving')) return 'Consultoría residencial';
+  if (has('breeam') && has('pre-assessment', 'preassessment', 'pre assessment', 'preevaluacion', 'pre-evaluacion', 'preanalisis', 'pre-analisis')) return 'Pre-assessment BREEAM';
   if (has('sostenib', 'breeam', 'leed', 'passivhaus', 'esg', 'descarboniz', 'clima')) return 'Clima y sostenibilidad';
   if (has('mep', 'climatizacion', 'electric', 'fontaneria', 'pci', 'instalacion', 'hvac')) return 'Ingeniería MEP';
   return 'Otros';

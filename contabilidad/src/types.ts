@@ -6,6 +6,7 @@ export type LineaServicio =
   | 'Consultoría fondos inmobiliarios'
   | 'Consultoría residencial'
   | 'Clima y sostenibilidad'
+  | 'Pre-assessment BREEAM'
   | 'Otros';
 
 export const LINEAS_SERVICIO: LineaServicio[] = [
@@ -16,6 +17,7 @@ export const LINEAS_SERVICIO: LineaServicio[] = [
   'Consultoría fondos inmobiliarios',
   'Consultoría residencial',
   'Clima y sostenibilidad',
+  'Pre-assessment BREEAM',
   'Otros',
 ];
 
