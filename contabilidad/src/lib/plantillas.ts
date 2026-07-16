@@ -282,7 +282,8 @@ export function adivinarLinea(texto: string): LineaServicio {
   if (has('fondo', 'due diligence', 'inversion', 'socimi', 'cartera', 'activos')) return 'Consultoría fondos inmobiliarios';
   if (has('residencia', 'residencial', 'senior living', 'flex living', 'coliving')) return 'Consultoría residencial';
   if (has('breeam') && has('pre-assessment', 'preassessment', 'pre assessment', 'preevaluacion', 'pre-evaluacion', 'preanalisis', 'pre-analisis')) return 'Pre-assessment BREEAM';
-  if (has('sostenib', 'breeam', 'leed', 'passivhaus', 'esg', 'descarboniz', 'clima')) return 'Clima y sostenibilidad';
+  // 'climatico'/'clima y...' y no 'clima' a secas: chocaría con "climatización"
+  if (has('sostenib', 'breeam', 'leed', 'passivhaus', 'esg', 'descarboniz', 'climatico', 'clima y')) return 'Clima y sostenibilidad';
   if (has('mep', 'climatizacion', 'electric', 'fontaneria', 'pci', 'instalacion', 'hvac')) return 'Ingeniería MEP';
   return 'Otros';
 }
