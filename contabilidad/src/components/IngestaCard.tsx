@@ -5,6 +5,7 @@ import { Card, Btn } from './ui';
 
 interface ResultadoIngesta {
   ficherosProcesados?: number;
+  pendientes?: number;
   importado?: { facturas?: number; movimientos?: number; gastos?: number; contactos?: number };
   detalle?: { fichero?: string; carpeta?: string; estado?: string; filas?: number; mensaje?: string; error?: string }[];
   error?: string;
@@ -14,9 +15,12 @@ interface ResultadoIngesta {
  *  bancos y gastos) sin esperar a la sincronización automática horaria. */
 const IngestaCard: React.FC = () => {
   const [corriendo, setCorriendo] = useState(false);
+  const [progreso, setProgreso] = useState('');
   const [res, setRes] = useState<ResultadoIngesta | null>(null);
   const [error, setError] = useState('');
 
+  /** La función procesa pocos ficheros por invocación (límite de recursos del
+   *  worker): aquí se encadenan pasadas hasta que no quede nada pendiente. */
   const lanzar = async () => {
     const client = getClient();
     if (!client) {
@@ -26,30 +30,50 @@ const IngestaCard: React.FC = () => {
     setCorriendo(true);
     setError('');
     setRes(null);
+    const total: Required<ResultadoIngesta> = {
+      ficherosProcesados: 0,
+      pendientes: 0,
+      importado: { facturas: 0, movimientos: 0, gastos: 0, contactos: 0 },
+      detalle: [],
+      error: '',
+    };
     try {
-      const { data, error: err } = await client.functions.invoke('ingesta', { body: {} });
-      if (err) {
-        const ctx = (err as { context?: Response }).context;
-        let detalle = err.message || 'Error llamando a la función';
-        if (ctx) {
-          if (ctx.status === 404) detalle = 'La función "ingesta" no está desplegada en Supabase.';
-          else {
-            try {
-              const cuerpo = await ctx.text();
-              detalle = `HTTP ${ctx.status}: ${JSON.parse(cuerpo).error || cuerpo.slice(0, 300)}`;
-            } catch { /* mensaje genérico */ }
+      for (let pasada = 1; pasada <= 20; pasada++) {
+        setProgreso(pasada === 1 ? 'Sincronizando…' : `Pasada ${pasada} (quedan ficheros pendientes)…`);
+        const { data, error: err } = await client.functions.invoke('ingesta', { body: {} });
+        if (err) {
+          const ctx = (err as { context?: Response }).context;
+          let detalle = err.message || 'Error llamando a la función';
+          if (ctx) {
+            if (ctx.status === 404) detalle = 'La función "ingesta" no está desplegada en Supabase.';
+            else {
+              try {
+                const cuerpo = await ctx.text();
+                detalle = `HTTP ${ctx.status}: ${JSON.parse(cuerpo).error || cuerpo.slice(0, 300)}`;
+              } catch { /* mensaje genérico */ }
+            }
           }
+          throw new Error(detalle);
         }
-        throw new Error(detalle);
+        if (data?.error) throw new Error(data.error);
+        total.ficherosProcesados += data?.ficherosProcesados || 0;
+        total.importado.facturas! += data?.importado?.facturas || 0;
+        total.importado.movimientos! += data?.importado?.movimientos || 0;
+        total.importado.gastos! += data?.importado?.gastos || 0;
+        total.importado.contactos! += data?.importado?.contactos || 0;
+        total.detalle.push(...(data?.detalle || []));
+        total.pendientes = data?.pendientes || 0;
+        setRes({ ...total });
+        if (!total.pendientes) break;
       }
-      if (data?.error) throw new Error(data.error);
-      setRes(data);
       // Trae a este navegador lo que la ingesta acabe de escribir en la nube
       await recargarDesdeNube();
     } catch (e) {
       setError((e as Error).message);
+      if (total.ficherosProcesados > 0) setRes({ ...total });
     } finally {
       setCorriendo(false);
+      setProgreso('');
     }
   };
 
@@ -65,7 +89,7 @@ const IngestaCard: React.FC = () => {
         modificados. Requiere rol Dirección y la función «ingesta» actualizada.
       </p>
       <Btn onClick={lanzar} disabled={corriendo}>
-        {corriendo ? '⏳ Sincronizando… (puede tardar un minuto)' : '🔄 Sincronizar ahora'}
+        {corriendo ? `⏳ ${progreso || 'Sincronizando…'}` : '🔄 Sincronizar ahora'}
       </Btn>
       {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
       {res && (
