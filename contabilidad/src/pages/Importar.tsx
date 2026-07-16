@@ -2,10 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { useAppData, setState, uid, ensureContacto, getState } from '../lib/store';
 import { leerExcel, detectarColumna, HojaExcel } from '../lib/excel';
 import { parseImporte, parseFecha, fmtEur } from '../lib/format';
-import { TipoMovimiento, TIPOS_MOVIMIENTO } from '../types';
+import { TipoMovimiento, TIPOS_MOVIMIENTO, EstadoOferta } from '../types';
+import { adivinarLinea } from '../lib/plantillas';
 import { Card, PageTitle, Btn, Field, inputCls, Table, Empty } from '../components/ui';
 
-type TipoImport = 'facturas' | 'banco' | 'gastos';
+type TipoImport = 'facturas' | 'banco' | 'gastos' | 'ofertas';
 
 interface CampoDef {
   clave: string;
@@ -31,6 +32,15 @@ const CAMPOS: Record<TipoImport, CampoDef[]> = {
     { clave: 'fecha', etiqueta: 'Fecha', obligatorio: true, detectar: ['fecha', 'f. valor', 'date', 'valor'] },
     { clave: 'concepto', etiqueta: 'Concepto', obligatorio: true, detectar: ['concepto', 'descripcion', 'detalle', 'observaciones'] },
     { clave: 'importe', etiqueta: 'Importe', obligatorio: true, detectar: ['importe', 'cantidad', 'monto', 'amount'] },
+  ],
+  ofertas: [
+    { clave: 'codigo', etiqueta: 'Código / nº', detectar: ['codigo', 'nº', 'num', 'presupuesto', 'oferta', 'ref'] },
+    { clave: 'fecha', etiqueta: 'Fecha', obligatorio: true, detectar: ['fecha', 'date'] },
+    { clave: 'cliente', etiqueta: 'Cliente', obligatorio: true, detectar: ['cliente', 'empresa', 'razon social', 'customer'] },
+    { clave: 'titulo', etiqueta: 'Título / objeto', obligatorio: true, detectar: ['titulo', 'objeto', 'propuesta', 'concepto', 'descripcion', 'proyecto', 'trabajo'] },
+    { clave: 'importe', etiqueta: 'Importe (base €)', obligatorio: true, detectar: ['importe', 'base', 'honorarios', 'precio', 'total'] },
+    { clave: 'estado', etiqueta: 'Estado', detectar: ['estado', 'situacion', 'resultado', 'aceptada', 'adjudicad'] },
+    { clave: 'superficie', etiqueta: 'Superficie (m²)', detectar: ['m²', 'm2', 'superficie'] },
   ],
   gastos: [
     { clave: 'fecha', etiqueta: 'Fecha', obligatorio: true, detectar: ['fecha', 'date'] },
@@ -175,6 +185,52 @@ const Importar: React.FC = () => {
         importados++;
       }
       setState((p) => ({ ...p, movimientos: [...p.movimientos, ...nuevos] }));
+    } else if (tipo === 'ofertas') {
+      const existentes = new Set(getState().ofertas.map((o) => o.codigo.trim().toLowerCase()));
+      const porTitulo = new Set(getState().ofertas.map((o) => `${o.titulo.trim().toLowerCase()}|${o.importe.toFixed(2)}`));
+      const nuevas: import('../types').Oferta[] = [];
+      let n = getState().ofertas.length;
+      const estadoDe = (v: unknown): EstadoOferta => {
+        const s = String(v ?? '').toLowerCase();
+        if (/acept|adjudicad|ganad|ok|si|sí|x/.test(s) && !/no /.test(s)) return 'aceptada';
+        if (/rechaz|perdid|ko|descartad/.test(s)) return 'rechazada';
+        if (/borrador/.test(s)) return 'borrador';
+        return 'enviada';
+      };
+      for (const fila of hoja.filas) {
+        const fecha = parseFecha(celda(fila, 'fecha'));
+        const clienteNombre = String(celda(fila, 'cliente') ?? '').trim();
+        const titulo = String(celda(fila, 'titulo') ?? '').trim();
+        const importe = parseImporte(celda(fila, 'importe'));
+        if (!fecha || !clienteNombre || !titulo || !importe) {
+          omitidos++;
+          continue;
+        }
+        n++;
+        const codigo = String(celda(fila, 'codigo') ?? '').trim() || `OF-${fecha.slice(0, 4)}-${String(n).padStart(3, '0')}`;
+        const claveTitulo = `${titulo.toLowerCase()}|${importe.toFixed(2)}`;
+        if (existentes.has(codigo.toLowerCase()) || porTitulo.has(claveTitulo)) {
+          omitidos++;
+          continue;
+        }
+        existentes.add(codigo.toLowerCase());
+        porTitulo.add(claveTitulo);
+        const superficie = mapeo.superficie !== undefined ? parseImporte(celda(fila, 'superficie')) : 0;
+        nuevas.push({
+          id: uid(),
+          codigo,
+          clienteId: ensureContacto(clienteNombre, 'cliente'),
+          titulo,
+          lineaServicio: adivinarLinea(titulo),
+          importe,
+          fecha,
+          estado: mapeo.estado !== undefined ? estadoDe(celda(fila, 'estado')) : 'enviada',
+          superficieM2: superficie > 0 ? superficie : undefined,
+          notas: `Importada del Excel «${nombreFichero}».`,
+        });
+        importados++;
+      }
+      setState((p) => ({ ...p, ofertas: [...p.ofertas, ...nuevas] }));
     } else {
       const nuevos: import('../types').Gasto[] = [];
       for (const fila of hoja.filas) {
@@ -241,6 +297,7 @@ const Importar: React.FC = () => {
               <option value="facturas">Facturas emitidas (mi hoja de facturación)</option>
               <option value="banco">Movimientos bancarios (cuenta, tarjeta, transferencias)</option>
               <option value="gastos">Gastos / facturas recibidas</option>
+              <option value="ofertas">Ofertas / presupuestos (histórico comercial)</option>
             </select>
           </Field>
           <Field label="2 · Fichero Excel o CSV" className="md:col-span-2">

@@ -279,11 +279,12 @@ export function adivinarLinea(texto: string): LineaServicio {
   if (has('legaliz', 'puesta en marcha', 'boletin', 'oca', 'industria')) return 'Legalizaciones';
   if (has('auditoria energetica', 'auditoria', 'certificado energetico', 'cee')) return 'Auditoría energética';
   if (has('simulacion', 'modelado', 'hulc', 'calener', 'designbuilder', 'ida ice')) return 'Modelado y simulación energética';
-  if (has('fondo', 'due diligence', 'inversion', 'socimi', 'cartera', 'activos')) return 'Consultoría fondos inmobiliarios';
-  if (has('residencia', 'residencial', 'senior living', 'flex living', 'coliving')) return 'Consultoría residencial';
+  // Sostenibilidad antes que fondos: "consultoría BREEAM de una cartera" es ESG
   if (has('breeam') && has('pre-assessment', 'preassessment', 'pre assessment', 'preevaluacion', 'pre-evaluacion', 'preanalisis', 'pre-analisis')) return 'Pre-assessment BREEAM';
   // 'climatico'/'clima y...' y no 'clima' a secas: chocaría con "climatización"
   if (has('sostenib', 'breeam', 'leed', 'passivhaus', 'esg', 'descarboniz', 'climatico', 'clima y')) return 'Clima y sostenibilidad';
+  if (has('fondo', 'due diligence', 'inversion', 'socimi', 'cartera', 'activos')) return 'Consultoría fondos inmobiliarios';
+  if (has('residencia', 'residencial', 'senior living', 'flex living', 'coliving')) return 'Consultoría residencial';
   if (has('mep', 'climatizacion', 'electric', 'fontaneria', 'pci', 'instalacion', 'hvac')) return 'Ingeniería MEP';
   return 'Otros';
 }
