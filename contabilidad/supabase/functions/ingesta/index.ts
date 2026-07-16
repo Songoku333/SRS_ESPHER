@@ -435,7 +435,7 @@ async function listarFicheros(deps: Deps, tok: string, driveId: string, ruta: st
   const pendientes = [{ id: raiz.id as string, ruta: '', nivel: 0 }];
   while (pendientes.length) {
     const dir = pendientes.shift()!;
-    let path = `/drives/${driveId}/items/${dir.id}/children?$select=id,name,eTag,file,folder&$top=200`;
+    let path = `/drives/${driveId}/items/${dir.id}/children?$select=id,name,eTag,file,folder,size&$top=200`;
     while (path) {
       const res = await graph(deps, tok, path);
       for (const item of res.value || []) {
@@ -465,17 +465,26 @@ export async function procesar(deps: Deps): Promise<any> {
   const resumen: any[] = [];
   const registrosNuevos: any[] = [];
 
+  // Candidatos nuevos/modificados de todas las carpetas. Se procesan como
+  // mucho MAX_POR_PASADA por invocación (límite de CPU/memoria del worker),
+  // los más pequeños primero; el registro de etags hace el resto reanudable.
+  const MAX_POR_PASADA = 3;
+  const candidatos: { carpeta: Carpeta; item: any; ruta: string }[] = [];
   for (const carpeta of deps.carpetas) {
-    let ficheros: { item: any; ruta: string }[];
     try {
-      ficheros = await listarFicheros(deps, tok, drive.id, carpeta.ruta);
+      for (const f of await listarFicheros(deps, tok, drive.id, carpeta.ruta)) {
+        if (registro.get(f.item.id) !== f.item.eTag) candidatos.push({ carpeta, item: f.item, ruta: f.ruta });
+      }
     } catch (e) {
       resumen.push({ carpeta: carpeta.ruta, error: (e as Error).message });
-      continue;
     }
+  }
+  candidatos.sort((a, b) => (a.item.size || 0) - (b.item.size || 0));
+  const lote = candidatos.slice(0, MAX_POR_PASADA);
+  const pendientes = candidatos.length - lote.length;
 
-    for (const { item, ruta } of ficheros) {
-      if (registro.get(item.id) === item.eTag) continue; // sin cambios
+  {
+    for (const { carpeta, item, ruta } of lote) {
       const ext = (item.name.split('.').pop() || '').toLowerCase();
       let estado = 'ignorado', filas = 0, mensaje = `Extensión .${ext} no soportada`;
       try {
@@ -516,6 +525,7 @@ export async function procesar(deps: Deps): Promise<any> {
   return {
     ejecutado: ahora,
     ficherosProcesados: resumen.length,
+    pendientes,
     importado: {
       facturas: ctx.nuevos.facturas.length,
       movimientos: ctx.nuevos.movimientos.length,
@@ -588,7 +598,7 @@ if (typeof Deno !== 'undefined' && Deno?.serve) {
   const parseWorkbook = async (bytes: Uint8Array): Promise<Hoja[]> => {
     xlsxMod ||= await import('npm:xlsx@0.18.5');
     // raw:true evita que las fechas de los CSV se interpreten al estilo americano
-    const wb = xlsxMod.read(bytes, { type: 'array', raw: true });
+    const wb = xlsxMod.read(bytes, { type: 'array', raw: true, dense: true });
     return wb.SheetNames.map((nombre: string) => {
       const matriz: unknown[][] = xlsxMod.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, defval: '', blankrows: false });
       let idx = 0;
