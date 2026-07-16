@@ -5,11 +5,11 @@ import { getClient } from './supabase';
 /** Secciones visibles por defecto según el rol (Dirección puede ajustarlas por miembro). */
 export function seccionesPorRol(rol: Rol): Page[] {
   if (rol === 'direccion')
-    return ['dashboard', 'ofertas', 'proyectos', 'facturas', 'gastos', 'banco', 'liquidaciones', 'rentabilidad', 'contactos', 'importar', 'usuarios', 'ajustes'];
+    return ['dashboard', 'ofertas', 'proyectos', 'trabajos', 'facturas', 'gastos', 'banco', 'liquidaciones', 'rentabilidad', 'contactos', 'importar', 'usuarios', 'ajustes'];
   if (rol === 'gestion')
-    return ['ofertas', 'proyectos', 'facturas', 'gastos', 'liquidaciones', 'contactos'];
+    return ['ofertas', 'proyectos', 'trabajos', 'facturas', 'gastos', 'liquidaciones', 'contactos'];
   // colaborador
-  return ['proyectos', 'liquidaciones'];
+  return ['proyectos', 'trabajos', 'liquidaciones'];
 }
 
 export interface Acceso {
@@ -201,7 +201,8 @@ export function filtrarPorAlcance(data: AppData, a: Acceso): AppData {
     });
     gastos.forEach((g) => g.contactoId && contIds.add(g.contactoId));
     const contactos = data.contactos.filter((c) => contIds.has(c.id));
-    return { contactos, ofertas, proyectos, facturas, gastos, movimientos: [], liquidaciones };
+    const tareas = data.tareas.filter((t) => proyectosVisibles.has(t.proyectoId));
+    return { contactos, ofertas, proyectos, facturas, gastos, movimientos: [], liquidaciones, tareas };
   }
 
   // colaborador: solo proyectos donde participa y sus liquidaciones
@@ -213,5 +214,9 @@ export function filtrarPorAlcance(data: AppData, a: Acceso): AppData {
   const facturas = data.facturas.filter((f) => f.proyectoId && proyIds.has(f.proyectoId));
   const liquidaciones = data.liquidaciones.filter((l) => l.contactoId === cid);
   const contactos = data.contactos.filter((c) => c.id === cid);
-  return { contactos, ofertas: [], proyectos, facturas, gastos: [], movimientos: [], liquidaciones };
+  // Tareas: las de sus proyectos que le están asignadas (o sin responsable)
+  const tareas = data.tareas.filter(
+    (t) => proyIds.has(t.proyectoId) && (!t.contactoId || t.contactoId === cid)
+  );
+  return { contactos, ofertas: [], proyectos, facturas, gastos: [], movimientos: [], liquidaciones, tareas };
 }

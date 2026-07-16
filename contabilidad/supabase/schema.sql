@@ -63,11 +63,19 @@ create table if not exists public.liquidaciones (
   primary key (user_id, id)
 );
 
+create table if not exists public.tareas (
+  id text not null,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  data jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+
 -- Seguridad a nivel de fila: cada usuario solo accede a lo suyo
 do $$
 declare t text;
 begin
-  foreach t in array array['contactos','ofertas','proyectos','facturas','gastos','movimientos','liquidaciones']
+  foreach t in array array['contactos','ofertas','proyectos','facturas','gastos','movimientos','liquidaciones','tareas']
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "propietario" on public.%I', t);

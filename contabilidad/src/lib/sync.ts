@@ -28,7 +28,16 @@ const COLECCIONES = [
   'gastos',
   'movimientos',
   'liquidaciones',
+  'tareas',
 ] as const;
+
+/** ¿El error es "la tabla no existe"? Las colecciones añadidas después del
+ *  schema.sql inicial (p. ej. tareas) no deben tumbar la sincronización del
+ *  resto mientras el usuario no ejecute la migración. */
+function tablaInexistente(error: unknown): boolean {
+  const msg = String((error as any)?.message || error || '').toLowerCase();
+  return msg.includes('does not exist') || (msg.includes('relation') && msg.includes('not'));
+}
 
 type Coleccion = (typeof COLECCIONES)[number];
 
@@ -154,7 +163,13 @@ async function descargarTodo(): Promise<AppData> {
   const out: AppData = { ...EMPTY_DATA };
   for (const c of COLECCIONES) {
     const { data, error } = await client.from(c).select('id,data');
-    if (error) throw error;
+    if (error) {
+      if (tablaInexistente(error)) {
+        console.warn(`Tabla "${c}" no encontrada en Supabase: ejecuta supabase/schema.sql para crearla.`);
+        continue;
+      }
+      throw error;
+    }
     (out as any)[c] = (data || []).map((r: any) => r.data);
   }
   return out;
@@ -211,7 +226,15 @@ async function flush() {
           updated_at: new Date().toISOString(),
         }));
         const { error } = await client.from(c).upsert(filas);
-        if (error) throw error;
+        if (error) {
+          if (tablaInexistente(error)) {
+            // La tabla aún no existe: no bloquear el resto (los datos siguen en local)
+            console.warn(`No se sube "${c}": falta la tabla en Supabase (schema.sql).`);
+            p.upserts.clear();
+            continue;
+          }
+          throw error;
+        }
         p.upserts.clear();
       }
       if (p.deletes.size > 0) {
@@ -219,7 +242,13 @@ async function flush() {
         // Sin filtro por user_id: en modo single-user la RLS ya restringe a las filas
         // propias; en modo compartido (multiusuario) la RLS gobierna por rol.
         const { error } = await client.from(c).delete().in('id', ids);
-        if (error) throw error;
+        if (error) {
+          if (tablaInexistente(error)) {
+            p.deletes.clear();
+            continue;
+          }
+          throw error;
+        }
         p.deletes.clear();
       }
     }

@@ -6,6 +6,7 @@ import { ROLES } from './types';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Ofertas from './pages/Ofertas';
+import Trabajos from './pages/Trabajos';
 import Proyectos from './pages/Proyectos';
 import Facturas from './pages/Facturas';
 import Gastos from './pages/Gastos';
@@ -21,6 +22,7 @@ const NAV: { page: Page; label: string; icon: string }[] = [
   { page: 'dashboard', label: 'Panel', icon: '📊' },
   { page: 'ofertas', label: 'Ofertas', icon: '📝' },
   { page: 'proyectos', label: 'Proyectos', icon: '🏗️' },
+  { page: 'trabajos', label: 'Trabajos', icon: '🛠️' },
   { page: 'facturas', label: 'Facturas', icon: '🧾' },
   { page: 'gastos', label: 'Gastos', icon: '💳' },
   { page: 'banco', label: 'Banco', icon: '🏦' },
@@ -66,6 +68,8 @@ const App: React.FC = () => {
         return <Dashboard />;
       case 'ofertas':
         return <Ofertas />;
+      case 'trabajos':
+        return <Trabajos />;
       case 'proyectos':
         return <Proyectos />;
       case 'facturas':

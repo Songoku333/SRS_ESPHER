@@ -103,6 +103,7 @@ export interface Proyecto {
   comercialId?: string; // contacto que percibe la comisión comercial
   comercialPct?: number; // por defecto 10
   gastosGeneralesPct?: number; // por defecto 20
+  easyEsgActivoId?: string; // activo vinculado en la plataforma EasyESG.pro
   notas?: string;
 }
 
@@ -204,6 +205,24 @@ export interface Liquidacion {
   fechaPago?: string;
 }
 
+export type EstadoTarea = 'pendiente' | 'en_curso' | 'hecha';
+
+/** Tarea de ejecución de un proyecto (módulo Trabajos). El plan nace de la
+ *  estimación de la oferta (disciplinas + hitos) y registra horas reales para
+ *  comparar con lo presupuestado. */
+export interface Tarea {
+  id: string;
+  proyectoId: string;
+  titulo: string;
+  disciplina?: string; // disciplina o categoría de la estimación (si aplica)
+  horasPrevistas: number;
+  horasReales: number;
+  estado: EstadoTarea;
+  contactoId?: string; // responsable (colaborador)
+  fechaLimite?: string; // ISO yyyy-mm-dd
+  notas?: string;
+}
+
 export interface AppData {
   contactos: Contacto[];
   ofertas: Oferta[];
@@ -212,6 +231,7 @@ export interface AppData {
   gastos: Gasto[];
   movimientos: MovimientoBancario[];
   liquidaciones: Liquidacion[];
+  tareas: Tarea[];
 }
 
 export const EMPTY_DATA: AppData = {
@@ -222,12 +242,14 @@ export const EMPTY_DATA: AppData = {
   gastos: [],
   movimientos: [],
   liquidaciones: [],
+  tareas: [],
 };
 
 export type Page =
   | 'dashboard'
   | 'ofertas'
   | 'proyectos'
+  | 'trabajos'
   | 'facturas'
   | 'gastos'
   | 'banco'
