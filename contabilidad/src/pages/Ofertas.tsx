@@ -5,6 +5,7 @@ import { Oferta, EstadoOferta, LineaServicio, LINEAS_SERVICIO } from '../types';
 import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
 import AsistenteOferta from '../components/AsistenteOferta';
+import ImportarOfertaPdf from '../components/ImportarOfertaPdf';
 import { abrirDocumentoOferta, generarDocumentoOferta } from '../lib/ofertaDoc';
 import { generarPlanTrabajos } from '../lib/trabajos';
 import { getClient } from '../lib/supabase';
@@ -28,6 +29,7 @@ const Ofertas: React.FC = () => {
   const [editando, setEditando] = useState<Oferta | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [asistente, setAsistente] = useState(false);
+  const [importarPdf, setImportarPdf] = useState(false);
   const [form, setForm] = useState<FormOferta>(formVacio());
 
   function formVacio(): FormOferta {
@@ -232,6 +234,7 @@ const Ofertas: React.FC = () => {
         subtitle={`Pipeline comercial · ${fmtEur(totalVivas)} en ofertas vivas`}
         actions={
           <div className="flex gap-2">
+            <Btn variant="secondary" onClick={() => setImportarPdf(true)}>📥 Importar PDF</Btn>
             <Btn variant="secondary" onClick={() => setAsistente(true)}>🧮 Preparar oferta</Btn>
             <Btn onClick={() => abrir()}>+ Nueva oferta</Btn>
           </div>
@@ -316,6 +319,8 @@ const Ofertas: React.FC = () => {
           </Table>
         )}
       </Card>
+
+      {importarPdf && <ImportarOfertaPdf data={data} onClose={() => setImportarPdf(false)} />}
 
       {asistente && (
         <AsistenteOferta

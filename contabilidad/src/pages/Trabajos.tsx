@@ -151,6 +151,12 @@ const Trabajos: React.FC = () => {
                 <div>
                   <span className="text-xs text-gray-500 block">Presupuesto de la oferta</span>
                   <span className="font-medium">{oferta ? fmtEur(oferta.importe) : '—'}</span>
+                  {oferta && resumen.horasPrevistas > 0 && (
+                    <span className="block text-xs text-gray-500">
+                      {(oferta.importe / resumen.horasPrevistas).toFixed(0)} €/h teórico
+                      {resumen.horasReales > 0 ? ` · ${(oferta.importe / resumen.horasReales).toFixed(0)} €/h real` : ''}
+                    </span>
+                  )}
                 </div>
               </div>
             </Card>
