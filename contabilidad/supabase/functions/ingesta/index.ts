@@ -604,7 +604,10 @@ if (typeof Deno !== 'undefined' && Deno?.serve) {
     });
   };
   const env = (k: string) => (Deno.env.get(k) || '').trim();
-  const rutas = (k: string) => env(k).split(';').map((r: string) => r.trim().replace(/^\/+|\/+$/g, '')).filter(Boolean);
+  // Separadores tolerantes: ';' y también tabuladores/saltos de línea que se
+  // cuelan al pegar el valor del secret. Los fragmentos rotos fallan solos
+  // sin bloquear las rutas buenas.
+  const rutas = (k: string) => env(k).split(/[;\t\n\r]+/).map((r: string) => r.trim().replace(/^\/+|\/+$/g, '')).filter(Boolean);
   const carpetas: Carpeta[] = [];
   for (const ruta of rutas('SP_CARPETA_FACTURAS')) carpetas.push({ ruta, tipo: 'facturas' });
   for (const ruta of rutas('SP_CARPETA_BANCO')) carpetas.push({ ruta, tipo: 'banco' });
