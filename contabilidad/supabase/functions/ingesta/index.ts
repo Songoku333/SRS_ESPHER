@@ -529,15 +529,43 @@ export async function procesar(deps: Deps): Promise<any> {
 // ---------- handler HTTP ----------
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
+
+/** ¿La petición viene de un usuario con sesión y rol Dirección? Permite lanzar
+ *  la ingesta a demanda desde el botón de Ajustes, además del cron horario. */
+async function esDireccion(req: Request, deps: Deps): Promise<boolean> {
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return false;
+  try {
+    const res = await deps.fetchFn(`${deps.url}/auth/v1/user`, {
+      headers: { apikey: deps.serviceKey, Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return false;
+    const email = String((await res.json())?.email || '').trim().toLowerCase();
+    if (!email) return false;
+    // Multiusuario: comprueba el rol en la tabla de miembros. Si la tabla no
+    // existe (modo cuenta única), cualquier usuario con sesión es Dirección.
+    const m = await deps.fetchFn(
+      `${deps.url}/rest/v1/miembros?email=eq.${encodeURIComponent(email)}&select=rol,activo`,
+      { headers: { apikey: deps.serviceKey, Authorization: `Bearer ${deps.serviceKey}` } }
+    );
+    if (!m.ok) return true; // tabla ausente → cuenta única
+    const filas = await m.json();
+    if (!Array.isArray(filas) || filas.length === 0) return true; // sin membresías aún (bootstrap)
+    return filas[0].rol === 'direccion' && filas[0].activo !== false;
+  } catch {
+    return false;
+  }
+}
 
 export async function handleIngesta(req: Request, deps: Deps): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   const auth = req.headers.get('authorization') || '';
-  if (auth !== `Bearer ${deps.serviceKey}`) {
-    return new Response(JSON.stringify({ error: 'No autorizado' }), {
+  const esCron = auth === `Bearer ${deps.serviceKey}`;
+  if (!esCron && !(await esDireccion(req, deps))) {
+    return new Response(JSON.stringify({ error: 'No autorizado: se necesita sesión con rol Dirección.' }), {
       status: 401, headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
