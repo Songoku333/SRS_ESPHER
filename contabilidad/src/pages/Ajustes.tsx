@@ -5,6 +5,7 @@ import { getConfig, setConfig, normalizarUrlProyecto } from '../lib/supabase';
 import { useSyncInfo, logout, recargarDesdeNube, subirTodoALaNube } from '../lib/sync';
 import { Card, PageTitle, Btn, Field, inputCls } from '../components/ui';
 import McpCard from '../components/McpCard';
+import ConectoresCard from '../components/ConectoresCard';
 
 const NubeCard: React.FC<{ onMsg: (m: string) => void }> = ({ onMsg }) => {
   const sync = useSyncInfo();
@@ -167,6 +168,7 @@ const Ajustes: React.FC = () => {
     ['Gastos', data.gastos.length],
     ['Movimientos bancarios', data.movimientos.length],
     ['Liquidaciones', data.liquidaciones.length],
+    ['Tareas de trabajos', data.tareas.length],
   ] as const;
 
   return (
@@ -178,6 +180,7 @@ const Ajustes: React.FC = () => {
       <div className="grid md:grid-cols-2 gap-4">
         <NubeCard onMsg={setMsg} />
         <McpCard />
+        <ConectoresCard />
         <Card className="p-5">
           <h3 className="font-semibold text-gray-800 mb-2">Copia de seguridad</h3>
           <p className="text-sm text-gray-500 mb-4">

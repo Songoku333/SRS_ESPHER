@@ -6,6 +6,7 @@ import { fmtEur, fmtDate, hoy } from '../lib/format';
 import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado, Empty } from '../components/ui';
 import AsistenteOferta from '../components/AsistenteOferta';
 import { abrirDocumentoOferta, generarDocumentoOferta } from '../lib/ofertaDoc';
+import { generarPlanTrabajos } from '../lib/trabajos';
 import { getClient } from '../lib/supabase';
 
 const ESTADOS: EstadoOferta[] = ['borrador', 'enviada', 'aceptada', 'rechazada'];
@@ -182,37 +183,38 @@ const Ofertas: React.FC = () => {
   const convertirEnProyecto = (o: Oferta) => {
     if (o.proyectoId) return;
     const proyectoId = uid();
+    const proyecto = {
+      id: proyectoId,
+      codigo: o.codigo.replace('OF', 'PR'),
+      nombre: o.titulo,
+      clienteId: o.clienteId,
+      lineaServicio: o.lineaServicio,
+      presupuesto: o.importe,
+      fechaInicio: hoy(),
+      estado: 'activo' as const,
+      repartos: [],
+      ...(o.estimacion
+        ? {
+            comercialPct: o.estimacion.comercialPct,
+            gastosGeneralesPct: o.estimacion.generalesPct,
+            modoReparto: 'horas' as const,
+            notas: `Presupuesto de horas de la oferta:\n${o.estimacion.equipo
+              .map((e) => `· ${e.rol}: ${e.horas} h × ${e.costeHora} €/h`)
+              .join('\n')}`,
+          }
+        : {}),
+    };
+    // El plan de ejecución nace directamente de la estimación de la oferta
+    const plan = generarPlanTrabajos(proyecto, o);
     setState((p) => ({
       ...p,
-      proyectos: [
-        ...p.proyectos,
-        {
-          id: proyectoId,
-          codigo: o.codigo.replace('OF', 'PR'),
-          nombre: o.titulo,
-          clienteId: o.clienteId,
-          lineaServicio: o.lineaServicio,
-          presupuesto: o.importe,
-          fechaInicio: hoy(),
-          estado: 'activo' as const,
-          repartos: [],
-          ...(o.estimacion
-            ? {
-                comercialPct: o.estimacion.comercialPct,
-                gastosGeneralesPct: o.estimacion.generalesPct,
-                modoReparto: 'horas' as const,
-                notas: `Presupuesto de horas de la oferta:\n${o.estimacion.equipo
-                  .map((e) => `· ${e.rol}: ${e.horas} h × ${e.costeHora} €/h`)
-                  .join('\n')}`,
-              }
-            : {}),
-        },
-      ],
+      proyectos: [...p.proyectos, proyecto],
+      tareas: [...p.tareas, ...plan],
       ofertas: p.ofertas.map((x) =>
         x.id === o.id ? { ...x, estado: 'aceptada' as const, proyectoId } : x
       ),
     }));
-    alert(`Proyecto creado a partir de la oferta ${o.codigo}. Configura el reparto en Proyectos.`);
+    alert(`Proyecto creado a partir de la oferta ${o.codigo}, con ${plan.length} tareas en Trabajos. Configura el reparto en Proyectos.`);
   };
 
   const lista = data.ofertas

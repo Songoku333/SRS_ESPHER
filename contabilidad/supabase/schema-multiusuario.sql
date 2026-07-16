@@ -82,7 +82,7 @@ create policy "miembros_admin" on public.miembros for all
 do $$
 declare t text; pk text;
 begin
-  foreach t in array array['contactos','ofertas','proyectos','facturas','gastos','movimientos','liquidaciones']
+  foreach t in array array['contactos','ofertas','proyectos','facturas','gastos','movimientos','liquidaciones','tareas']
   loop
     -- 4.1) Eliminar la clave primaria compuesta actual (sea cual sea su nombre)
     select conname into pk from pg_constraint
@@ -154,6 +154,16 @@ create policy "acceso" on public.liquidaciones for all
       or (public.mi_rol() = 'colaborador' and (data->>'contactoId') = public.mi_contacto()))
   with check (public.es_direccion()
       or (public.mi_rol() = 'gestion' and public.proyecto_visible(data->>'proyectoId')));
+
+drop policy if exists "propietario" on public.tareas;
+drop policy if exists "acceso" on public.tareas;
+create policy "acceso" on public.tareas for all
+  using (public.es_direccion()
+      or (public.mi_rol() = 'gestion' and public.proyecto_visible(data->>'proyectoId'))
+      or (public.mi_rol() = 'colaborador' and public.proyecto_visible(data->>'proyectoId')))
+  with check (public.es_direccion()
+      or (public.mi_rol() = 'gestion' and public.proyecto_visible(data->>'proyectoId'))
+      or (public.mi_rol() = 'colaborador' and public.proyecto_visible(data->>'proyectoId')));
 
 -- 6) Tu alta como Dirección.
 -- No hace falta hacer nada manual: al entrar en la app por primera vez con el
