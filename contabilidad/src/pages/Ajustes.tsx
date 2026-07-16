@@ -6,6 +6,7 @@ import { useSyncInfo, logout, recargarDesdeNube, subirTodoALaNube } from '../lib
 import { Card, PageTitle, Btn, Field, inputCls } from '../components/ui';
 import McpCard from '../components/McpCard';
 import ConectoresCard from '../components/ConectoresCard';
+import IngestaCard from '../components/IngestaCard';
 
 const NubeCard: React.FC<{ onMsg: (m: string) => void }> = ({ onMsg }) => {
   const sync = useSyncInfo();
@@ -179,6 +180,7 @@ const Ajustes: React.FC = () => {
 
       <div className="grid md:grid-cols-2 gap-4">
         <NubeCard onMsg={setMsg} />
+        <IngestaCard />
         <McpCard />
         <ConectoresCard />
         <Card className="p-5">
