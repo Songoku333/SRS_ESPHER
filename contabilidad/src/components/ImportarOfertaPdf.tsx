@@ -15,6 +15,22 @@ interface HorasMiembro {
   horas: number;
 }
 
+/** Fila del modo lote: un PDF ya leído, pendiente de revisión. */
+interface FilaLote {
+  fichero: string;
+  incluir: boolean;
+  duplicada: boolean;
+  codigo: string;
+  cliente: string;
+  titulo: string;
+  fecha: string;
+  importe: number;
+  superficieM2?: number;
+  linea: LineaServicio;
+  destino: DestinoImportacion;
+  det: OfertaDetectada;
+}
+
 const num = (s: string) => parseFloat(s) || 0;
 
 /** Importa una oferta existente en PDF: detecta los campos, se revisan, y
@@ -26,6 +42,8 @@ const ImportarOfertaPdf: React.FC<{ data: AppData; onClose: () => void }> = ({ d
   const [error, setError] = useState('');
   const [fichero, setFichero] = useState('');
   const [det, setDet] = useState<OfertaDetectada | null>(null);
+  const [lote, setLote] = useState<FilaLote[] | null>(null);
+  const [progreso, setProgreso] = useState('');
 
   // Campos editables tras la detección
   const [titulo, setTitulo] = useState('');
@@ -39,6 +57,136 @@ const ImportarOfertaPdf: React.FC<{ data: AppData; onClose: () => void }> = ({ d
   const [horas, setHoras] = useState<HorasMiembro[]>([]);
 
   const colaboradores = data.contactos.filter((c) => c.tipo === 'colaborador');
+
+  const codigoDe = (nombre: string, indice: number): string => {
+    const m = nombre.match(/(\d{4})[_\s-]?(\d{2,4})/);
+    return m
+      ? `OF-${m[1]}-${m[2].padStart(3, '0')}`
+      : `OF-${new Date().getFullYear()}-${String(data.ofertas.length + indice + 1).padStart(3, '0')}`;
+  };
+
+  const esDuplicada = (codigo: string, titulo: string, importe: number): boolean =>
+    data.ofertas.some(
+      (o) =>
+        o.codigo.trim().toLowerCase() === codigo.trim().toLowerCase() ||
+        (o.titulo.trim().toLowerCase() === titulo.trim().toLowerCase() && Math.abs(o.importe - importe) < 0.01)
+    );
+
+  /** Modo lote: lee todos los PDFs en secuencia y monta la tabla de revisión. */
+  const procesarLote = async (files: File[]) => {
+    setLeyendo(true);
+    setError('');
+    const filas: FilaLote[] = [];
+    for (let i = 0; i < files.length; i++) {
+      setProgreso(`Leyendo ${i + 1}/${files.length}: ${files[i].name}`);
+      try {
+        const texto = await extraerTextoPdf(files[i]);
+        const d = parsearOferta(texto);
+        const codigo = codigoDe(files[i].name, i);
+        const titulo = d.titulo || files[i].name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ');
+        filas.push({
+          fichero: files[i].name,
+          incluir: d.importe > 0 && !esDuplicada(codigo, titulo, d.importe),
+          duplicada: esDuplicada(codigo, titulo, d.importe),
+          codigo,
+          cliente: d.cliente,
+          titulo,
+          fecha: d.fecha || hoy(),
+          importe: d.importe,
+          superficieM2: d.superficieM2,
+          linea: d.linea,
+          destino: 'pipeline',
+          det: d,
+        });
+      } catch {
+        filas.push({
+          fichero: files[i].name,
+          incluir: false,
+          duplicada: false,
+          codigo: codigoDe(files[i].name, i),
+          cliente: '',
+          titulo: `⚠ No se pudo leer: ${files[i].name}`,
+          fecha: hoy(),
+          importe: 0,
+          linea: 'Otros',
+          destino: 'pipeline',
+          det: { titulo: '', cliente: '', fecha: '', importe: 0, linea: 'Otros', partidas: [], texto: '' },
+        });
+      }
+    }
+    setLote(filas);
+    setProgreso('');
+    setLeyendo(false);
+  };
+
+  /** Crea en un solo paso todas las filas del lote marcadas como incluir. */
+  const crearLote = () => {
+    if (!lote) return;
+    const ofertas: Oferta[] = [];
+    const proyectos: AppData['proyectos'] = [];
+    const tareas: Tarea[] = [];
+    for (const f of lote) {
+      if (!f.incluir || !f.cliente.trim() || !f.titulo.trim() || f.importe <= 0) continue;
+      const clienteId = ensureContacto(f.cliente.trim(), 'cliente');
+      const s = sugerirParametros(data, f.linea, f.importe, 'medio', undefined, f.superficieM2);
+      const base = calcularPresupuesto(s.params);
+      const pesos =
+        f.det.partidas.length >= 2
+          ? f.det.partidas.map((p) => ({ nombre: p.concepto.slice(0, 60), peso: p.importe }))
+          : (PLANTILLAS[f.linea] ?? PLANTILLAS['Otros']).disciplinas?.map((d) => ({ nombre: d.nombre, peso: d.peso })) || [];
+      const disciplinas = pesos.length ? desglosarDisciplinas(pesos, base.totalHoras, base.costeEquipo) : [];
+      const { estimacion, resumen } = construirEstimacion(s.params, f.importe, {
+        superficieM2: f.superficieM2,
+        disciplinas,
+      });
+      const ofertaId = uid();
+      const proyectoId = f.destino === 'pipeline' ? undefined : uid();
+      const oferta: Oferta = {
+        id: ofertaId,
+        codigo: f.codigo,
+        clienteId,
+        titulo: f.titulo.trim(),
+        lineaServicio: f.linea,
+        importe: f.importe,
+        fecha: f.fecha,
+        estado: f.destino === 'pipeline' ? 'enviada' : 'aceptada',
+        proyectoId,
+        superficieM2: f.superficieM2,
+        notas: `Importada del PDF «${f.fichero}» (lote).\n${resumen}`,
+        estimacion,
+      };
+      ofertas.push(oferta);
+      if (proyectoId) {
+        const proyecto = {
+          id: proyectoId,
+          codigo: f.codigo.replace('OF', 'PR'),
+          nombre: oferta.titulo,
+          clienteId,
+          lineaServicio: f.linea,
+          presupuesto: f.importe,
+          fechaInicio: f.fecha,
+          estado: 'activo' as const,
+          repartos: [],
+          comercialPct: estimacion.comercialPct,
+          gastosGeneralesPct: estimacion.generalesPct,
+          modoReparto: 'horas' as const,
+          notas: `Importado del PDF «${f.fichero}».`,
+        };
+        proyectos.push(proyecto);
+        const plan = generarPlanTrabajos(proyecto, oferta);
+        if (f.destino === 'terminado') for (const t of plan) t.estado = 'hecha';
+        tareas.push(...plan);
+      }
+    }
+    setState((p) => ({
+      ...p,
+      ofertas: [...p.ofertas, ...ofertas],
+      proyectos: [...p.proyectos, ...proyectos],
+      tareas: [...p.tareas, ...tareas],
+    }));
+    alert(`Importadas ${ofertas.length} ofertas (${proyectos.length} con proyecto y plan de trabajos). Las horas dedicadas se registran en Trabajos.`);
+    onClose();
+  };
 
   const abrirFichero = async (f: File) => {
     setLeyendo(true);
@@ -156,24 +304,100 @@ const ImportarOfertaPdf: React.FC<{ data: AppData; onClose: () => void }> = ({ d
   return (
     <Modal title="📥 Importar oferta desde PDF" onClose={onClose} wide>
       <div className="space-y-4">
-        {!det && (
+        {!det && !lote && (
           <div className="text-center py-6">
             <label className="inline-block px-4 py-3 bg-teal-600 text-white rounded-lg cursor-pointer hover:bg-teal-700">
-              {leyendo ? 'Leyendo el PDF…' : 'Elegir PDF de la oferta'}
+              {leyendo ? progreso || 'Leyendo el PDF…' : 'Elegir PDF(s) de ofertas'}
               <input
                 type="file"
                 accept=".pdf"
+                multiple
                 className="hidden"
                 disabled={leyendo}
-                onChange={(e) => e.target.files?.[0] && abrirFichero(e.target.files[0])}
+                onChange={(e) => {
+                  const files = [...(e.target.files || [])];
+                  if (files.length === 1) void abrirFichero(files[0]);
+                  else if (files.length > 1) void procesarLote(files);
+                }}
               />
             </label>
             <p className="text-xs text-gray-500 mt-3">
-              Reconoce las ofertas con el formato de la casa (título, cliente, partidas del presupuesto y base
-              imponible). Todo lo detectado se puede corregir antes de crear nada.
+              Puedes seleccionar <b>varios PDFs a la vez</b> (p. ej. toda la carpeta de ofertas sincronizada de
+              SharePoint): la app los lee en tu navegador y te enseña una tabla para revisarlos antes de crear nada.
             </p>
             {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
           </div>
+        )}
+
+        {lote && (
+          <>
+            <p className="text-sm text-gray-600">
+              {lote.length} PDFs leídos · {lote.filter((f) => f.incluir).length} marcados para importar
+              {lote.some((f) => f.duplicada) && ' · los duplicados vienen desmarcados'}
+            </p>
+            <div className="overflow-x-auto max-h-96 overflow-y-auto border border-gray-200 rounded">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-gray-50">
+                  <tr className="text-left text-gray-500">
+                    <th className="p-2">✓</th>
+                    <th className="p-2">Código</th>
+                    <th className="p-2">Cliente</th>
+                    <th className="p-2">Título</th>
+                    <th className="p-2">Fecha</th>
+                    <th className="p-2">Base €</th>
+                    <th className="p-2">Línea</th>
+                    <th className="p-2">Destino</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lote.map((f, i) => {
+                    const upd = (cambios: Partial<FilaLote>) =>
+                      setLote(lote.map((x, j) => (j === i ? { ...x, ...cambios } : x)));
+                    return (
+                      <tr key={i} className={`border-t border-gray-100 ${!f.incluir ? 'opacity-50' : ''}`}>
+                        <td className="p-1">
+                          <input type="checkbox" checked={f.incluir} onChange={(e) => upd({ incluir: e.target.checked })} />
+                          {f.duplicada && <span title="Ya existe una oferta con este código o título e importe"> ⚠</span>}
+                        </td>
+                        <td className="p-1"><input className={`${inputCls} py-0.5 text-xs w-28`} value={f.codigo} onChange={(e) => upd({ codigo: e.target.value })} /></td>
+                        <td className="p-1"><input className={`${inputCls} py-0.5 text-xs w-28`} value={f.cliente} onChange={(e) => upd({ cliente: e.target.value })} /></td>
+                        <td className="p-1"><input className={`${inputCls} py-0.5 text-xs min-w-[220px]`} value={f.titulo} onChange={(e) => upd({ titulo: e.target.value })} title={f.fichero} /></td>
+                        <td className="p-1"><input type="date" className={`${inputCls} py-0.5 text-xs`} value={f.fecha} onChange={(e) => upd({ fecha: e.target.value })} /></td>
+                        <td className="p-1"><input type="number" step="0.01" className={`${inputCls} py-0.5 text-xs w-24`} value={f.importe || ''} onChange={(e) => upd({ importe: num(e.target.value) })} /></td>
+                        <td className="p-1">
+                          <select className={`${inputCls} py-0.5 text-xs`} value={f.linea} onChange={(e) => upd({ linea: e.target.value as LineaServicio })}>
+                            {LINEAS_SERVICIO.map((l) => (
+                              <option key={l}>{l}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <select className={`${inputCls} py-0.5 text-xs`} value={f.destino} onChange={(e) => upd({ destino: e.target.value as DestinoImportacion })}>
+                            <option value="pipeline">Solo oferta</option>
+                            <option value="encurso">En curso</option>
+                            <option value="terminado">Terminado</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-gray-500">
+              «En curso» y «Terminado» crean además el proyecto con su plan de tareas (senda teórica). Las horas
+              dedicadas de cada miembro se registran después en Trabajos, proyecto a proyecto.
+            </p>
+            <div className="flex justify-between pt-2">
+              <Btn variant="secondary" onClick={() => setLote(null)}>← Otros PDFs</Btn>
+              <div className="flex gap-2">
+                <Btn variant="secondary" onClick={onClose}>Cancelar</Btn>
+                <Btn onClick={crearLote} disabled={!lote.some((f) => f.incluir && f.cliente.trim() && f.titulo.trim() && f.importe > 0)}>
+                  Importar {lote.filter((f) => f.incluir && f.cliente.trim() && f.titulo.trim() && f.importe > 0).length} ofertas
+                </Btn>
+              </div>
+            </div>
+          </>
         )}
 
         {det && (
