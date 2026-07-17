@@ -7,6 +7,7 @@ import { Card, PageTitle, Btn, Modal, Field, inputCls, Table, Badge, badgeEstado
 import AsistenteOferta from '../components/AsistenteOferta';
 import ImportarOfertaPdf from '../components/ImportarOfertaPdf';
 import { abrirDocumentoOferta, generarDocumentoOferta } from '../lib/ofertaDoc';
+import { descargarDocxOferta } from '../lib/ofertaDocx';
 import { generarPlanTrabajos } from '../lib/trabajos';
 import { getClient } from '../lib/supabase';
 
@@ -92,6 +93,19 @@ const Ofertas: React.FC = () => {
   };
 
   const [subiendo, setSubiendo] = useState<string | null>(null);
+  const [generando, setGenerando] = useState<string | null>(null);
+
+  /** Descarga la oferta como Word (.docx) editable, con portada de marca. */
+  const descargarWord = async (o: Oferta) => {
+    setGenerando(o.id);
+    try {
+      await descargarDocxOferta(o, data.contactos.find((c) => c.id === o.clienteId));
+    } catch (e) {
+      alert(`No se pudo generar el documento Word: ${(e as Error).message}`);
+    } finally {
+      setGenerando(null);
+    }
+  };
 
   /** Genera el documento y lo archiva en la carpeta de ofertas de SharePoint. */
   const subirASharePoint = async (o: Oferta) => {
@@ -296,8 +310,11 @@ const Ofertas: React.FC = () => {
                   <Badge color={badgeEstado[o.estado]}>{o.estado}</Badge>
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <Btn variant="ghost" title="Descargar la oferta en Word (.docx) editable" onClick={() => descargarWord(o)} disabled={generando === o.id}>
+                    {generando === o.id ? '…' : '📄'}
+                  </Btn>
                   <Btn variant="ghost" title="Ver / imprimir el documento de oferta" onClick={() => abrirDocumentoOferta(o, data.contactos.find((c) => c.id === o.clienteId))}>
-                    📄
+                    🖨
                   </Btn>
                   <Btn variant="ghost" title="Archivar el documento en SharePoint" onClick={() => subirASharePoint(o)} disabled={subiendo === o.id}>
                     {subiendo === o.id ? '…' : '☁'}

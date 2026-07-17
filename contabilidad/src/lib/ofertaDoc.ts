@@ -84,7 +84,7 @@ export function capitulosPresupuesto(oferta: Oferta): CapituloPresupuesto[] {
 }
 
 /** Exclusiones estándar de la casa (de los modelos de oferta SmartRem). */
-function exclusiones(oferta: Oferta): string[] {
+export function exclusiones(oferta: Oferta): string[] {
   const conModulo = !!oferta.estimacion?.sostenibilidad;
   if (oferta.lineaServicio === 'Pre-assessment BREEAM') {
     return [
@@ -117,7 +117,7 @@ function exclusiones(oferta: Oferta): string[] {
 }
 
 /** Condiciones económicas estándar de la casa. */
-function condicionesEconomicas(oferta: Oferta): string[] {
+export function condicionesEconomicas(oferta: Oferta): string[] {
   const sost = oferta.estimacion?.sostenibilidad;
   const lineas = [
     'En la propuesta de honorarios no está incluido el IVA.',
