@@ -12,6 +12,27 @@ const TIPOS: { valor: TipoContacto; etiqueta: string; color: string }[] = [
 
 const VACIO: Omit<Contacto, 'id'> = { tipo: 'cliente', nombre: '', nif: '', email: '', telefono: '', notas: '' };
 
+/** Redimensiona una imagen a ≤300px de lado y la devuelve como dataURL PNG. */
+async function redimensionarLogo(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = url;
+    });
+    const escala = Math.min(1, 300 / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * escala);
+    canvas.height = Math.round(img.height * escala);
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 const Contactos: React.FC = () => {
   const data = useDatosVisibles();
   const [filtro, setFiltro] = useState<TipoContacto | 'todos'>('todos');
@@ -147,6 +168,26 @@ const Contactos: React.FC = () => {
                 <input className={inputCls} value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
               </Field>
             </div>
+            {form.tipo === 'cliente' && (
+              <Field label="Logo del cliente (para la portada de las ofertas)">
+                <div className="flex items-center gap-3">
+                  {form.logo && <img src={form.logo} alt="logo" className="h-10 max-w-[120px] object-contain border border-gray-200 rounded p-1" />}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="text-sm text-gray-600"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setForm({ ...form, logo: await redimensionarLogo(f) });
+                      e.target.value = '';
+                    }}
+                  />
+                  {form.logo && (
+                    <Btn variant="ghost" className="text-red-600" onClick={() => setForm({ ...form, logo: undefined })}>✕</Btn>
+                  )}
+                </div>
+              </Field>
+            )}
             <Field label="Email">
               <input className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </Field>

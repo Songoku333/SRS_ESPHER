@@ -131,12 +131,23 @@ export async function cargarAcceso(email: string) {
       });
       return;
     }
+    // Secciones añadidas después del lanzamiento: los miembros con lista
+    // explícita guardada antes de que existieran deben verlas igualmente
+    // si su rol las incluye por defecto (p. ej. «trabajos»).
+    const NUEVAS_SECCIONES: Page[] = ['trabajos'];
+    const seccionesDe = (m: Miembro): Page[] => {
+      if (!m.secciones || m.secciones.length === 0) return seccionesPorRol(m.rol);
+      const extra = NUEVAS_SECCIONES.filter(
+        (s) => seccionesPorRol(m.rol).includes(s) && !m.secciones!.includes(s)
+      );
+      return [...m.secciones, ...extra];
+    };
     setAcceso({
       cargado: true,
       miembro: yo,
       rol: yo.rol,
       email: correo,
-      secciones: yo.secciones && yo.secciones.length ? yo.secciones : seccionesPorRol(yo.rol),
+      secciones: seccionesDe(yo),
       clientesAsignados: yo.rol === 'direccion' ? undefined : yo.clientesAsignados,
       proyectosAsignados: yo.rol === 'direccion' ? undefined : yo.proyectosAsignados,
       contactoId: yo.contactoId,
@@ -205,10 +216,16 @@ export function filtrarPorAlcance(data: AppData, a: Acceso): AppData {
     return { contactos, ofertas, proyectos, facturas, gastos, movimientos: [], liquidaciones, tareas };
   }
 
-  // colaborador: solo proyectos donde participa y sus liquidaciones
+  // colaborador: proyectos donde participa (reparto, comercial o con tareas
+  // asignadas a su nombre) y sus liquidaciones
   const cid = a.contactoId;
+  const proyectosConTarea = new Set(
+    data.tareas.filter((t) => cid && t.contactoId === cid).map((t) => t.proyectoId)
+  );
   const proyectos = data.proyectos.filter(
-    (p) => cid && (p.comercialId === cid || p.repartos.some((r) => r.contactoId === cid))
+    (p) =>
+      cid &&
+      (p.comercialId === cid || p.repartos.some((r) => r.contactoId === cid) || proyectosConTarea.has(p.id))
   );
   const proyIds = new Set(proyectos.map((p) => p.id));
   const facturas = data.facturas.filter((f) => f.proyectoId && proyIds.has(f.proyectoId));

@@ -30,6 +30,7 @@ export interface Contacto {
   nif?: string;
   email?: string;
   telefono?: string;
+  logo?: string; // dataURL (≤300px) para las portadas de ofertas
   notas?: string;
 }
 
